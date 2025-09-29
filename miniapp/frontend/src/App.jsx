@@ -112,7 +112,7 @@ async function apiRequest(path, options = {}) {
     try { tg.ready(); } catch (_) {} 
   }
   
-  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : '');
+  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : 'https://89.169.170.241:8000');
   const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const url = new URL((base || "") + apiPath, window.location.origin);
   
@@ -195,13 +195,23 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
       }
 
       // Try to find user by phone
-      const response = await fetch(`https://radarbotfront.vercel.app/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      console.log('Trying to login with phone:', normalizedPhone)
+      const response = await fetch(`https://89.169.170.241:8000/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      
+      console.log('Response status:', response.status)
+      const responseText = await response.text()
+      console.log('Response text:', responseText)
       
       if (response.ok) {
         onConfirm(normalizedPhone)
         notifications.show({ message: 'Вход выполнен успешно', color: 'green' })
       } else {
-        notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+        try {
+          const errorData = JSON.parse(responseText)
+          notifications.show({ message: `Ошибка: ${errorData.detail || 'Пользователь не найден'}`, color: 'red' })
+        } catch {
+          notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+        }
       }
     } catch (error) {
       notifications.show({ message: 'Ошибка при входе', color: 'red' })
@@ -299,13 +309,23 @@ function LoginForm({ onLogin }) {
       }
 
       // Try to find user by phone
-      const response = await fetch(`https://radarbotfront.vercel.app/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      console.log('Trying to login with phone:', normalizedPhone)
+      const response = await fetch(`https://89.169.170.241:8000/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      
+      console.log('Response status:', response.status)
+      const responseText = await response.text()
+      console.log('Response text:', responseText)
       
       if (response.ok) {
         onLogin(normalizedPhone)
         notifications.show({ message: 'Вход выполнен успешно', color: 'green' })
       } else {
-        notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+        try {
+          const errorData = JSON.parse(responseText)
+          notifications.show({ message: `Ошибка: ${errorData.detail || 'Пользователь не найден'}`, color: 'red' })
+        } catch {
+          notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+        }
       }
     } catch (error) {
       notifications.show({ message: 'Ошибка при входе', color: 'red' })

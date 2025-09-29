@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 27 — Fix uninitialized variable error";
+export const MINIAPP_REV = "Правка 28 — Connect to server backend instead of local";
