@@ -313,8 +313,19 @@ function LoginForm({ onLogin }) {
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e) => {
+    console.log('=== HANDLE SUBMIT CALLED ===')
+    console.log('Event:', e)
+    console.log('Phone before preventDefault:', phone)
+    
     e.preventDefault()
-    if (!phone.trim()) return
+    
+    console.log('After preventDefault')
+    console.log('Phone trim check:', phone.trim())
+    
+    if (!phone.trim()) {
+      console.log('Phone is empty, returning')
+      return
+    }
 
     console.log('=== LOGIN FORM SUBMIT ===')
     console.log('Original phone input:', phone)
@@ -406,6 +417,11 @@ function LoginForm({ onLogin }) {
                   fullWidth
                   leftSection={<IconLogin size={16} />}
                   loading={loading}
+                  onClick={() => {
+                    console.log('Button clicked!')
+                    console.log('Phone value:', phone)
+                    console.log('Loading state:', loading)
+                  }}
                 >
                   Войти
                 </Button>
