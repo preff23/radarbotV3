@@ -180,6 +180,8 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
     e.preventDefault()
     if (!phone.trim()) return
 
+    console.log('=== PHONE CONFIRMATION FORM SUBMIT ===')
+    console.log('Original phone input:', phone)
     setLoading(true)
     try {
       // Normalize phone number - remove all non-digits first
@@ -232,7 +234,8 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
         }
       }
     } catch (error) {
-      notifications.show({ message: 'Ошибка при входе', color: 'red' })
+      console.error('Login error:', error)
+      notifications.show({ message: `Ошибка при входе: ${error.message}`, color: 'red' })
     } finally {
       setLoading(false)
     }
@@ -313,6 +316,8 @@ function LoginForm({ onLogin }) {
     e.preventDefault()
     if (!phone.trim()) return
 
+    console.log('=== LOGIN FORM SUBMIT ===')
+    console.log('Original phone input:', phone)
     setLoading(true)
     try {
       // Normalize phone number - remove all non-digits first
@@ -365,7 +370,8 @@ function LoginForm({ onLogin }) {
         }
       }
     } catch (error) {
-      notifications.show({ message: 'Ошибка при входе', color: 'red' })
+      console.error('Login error:', error)
+      notifications.show({ message: `Ошибка при входе: ${error.message}`, color: 'red' })
     } finally {
       setLoading(false)
     }

@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 30 — Improve phone number normalization for all formats";
+export const MINIAPP_REV = "Правка 31 — Add debug logging for login issues";
