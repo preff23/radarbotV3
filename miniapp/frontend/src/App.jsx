@@ -28,7 +28,7 @@ import {
   Center,
 } from '@mantine/core'
 import { Notifications, notifications } from '@mantine/notifications'
-import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus, IconPhone, IconLogin } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus, IconPhone, IconLogin, IconLogout } from '@tabler/icons-react'
 import './App.css'
 import { MINIAPP_REV } from './version' 
 
@@ -813,6 +813,13 @@ export default function App() {
   const [userPhone, setUserPhone] = useState(null)
   const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
   const [detectedPhone, setDetectedPhone] = useState(null)
+
+  const handleLogout = () => {
+    setUserPhone(null)
+    setShowPhoneConfirmation(false)
+    setDetectedPhone(null)
+    notifications.show({ message: 'Вы вышли из профиля', color: 'blue' })
+  }
   
   // Check if user is authenticated
   const telegramData = getUserData()
@@ -1056,6 +1063,22 @@ export default function App() {
                   }}
                 >
                   Добавить
+                </Button>
+              </Tooltip>
+              <Tooltip label="Выйти из профиля">
+                <Button
+                  size="sm"
+                  leftSection={<IconLogout size={16} />}
+                  onClick={handleLogout}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  Выйти
                 </Button>
               </Tooltip>
             </Group>
