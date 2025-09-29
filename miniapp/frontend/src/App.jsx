@@ -112,7 +112,7 @@ async function apiRequest(path, options = {}) {
     try { tg.ready(); } catch (_) {} 
   }
   
-  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : 'http://localhost:8000');
+  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : '');
   const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const url = new URL((base || "") + apiPath, window.location.origin);
   
@@ -216,7 +216,7 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
 
       // Try to find user by phone
       console.log('Trying to login with phone:', normalizedPhone)
-      const response = await fetch(`http://localhost:8000/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      const response = await fetch(`/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
       
       console.log('Response status:', response.status)
       const responseText = await response.text()
@@ -352,7 +352,7 @@ function LoginForm({ onLogin }) {
 
       // Try to find user by phone
       console.log('Trying to login with phone:', normalizedPhone)
-      const response = await fetch(`http://localhost:8000/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      const response = await fetch(`/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
       
       console.log('Response status:', response.status)
       const responseText = await response.text()
@@ -855,6 +855,8 @@ function EditPositionModal({ opened, onClose, position, onSubmit }) {
 }
 
 export default function App() {
+  console.log('App component rendering...')
+  
   const [userPhone, setUserPhone] = useState(null)
   const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
   const [detectedPhone, setDetectedPhone] = useState(null)
