@@ -24,9 +24,11 @@ import {
   Tooltip,
   Avatar,
   Progress,
+  Container,
+  Center,
 } from '@mantine/core'
 import { Notifications, notifications } from '@mantine/notifications'
-import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus, IconPhone, IconLogin } from '@tabler/icons-react'
 import './App.css'
 import { MINIAPP_REV } from './version' 
 
@@ -83,17 +85,18 @@ function getUserData() {
     }
   }
 
-  // Last resort: use default data for development
-  console.log('Using default data for development')
-  return {
-    telegram_id: '521751895',
-    phone: '+79151731545',
-    username: 'goretofff'
-  }
+  // Last resort: return null to show login form
+  console.log('No user data available, showing login form')
+  return null
 }
 
 async function apiRequest(path, options = {}) {
   const userData = getUserData()
+  
+  if (!userData) {
+    throw new Error('User not authenticated')
+  }
+  
   const headers = new Headers(options.headers || {})
   
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
@@ -167,6 +170,88 @@ function usePortfolio() {
   }
 
   return { data, loading, error, refresh }
+}
+
+function LoginForm({ onLogin }) {
+  const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!phone.trim()) return
+
+    setLoading(true)
+    try {
+      // Normalize phone number
+      let normalizedPhone = phone.trim()
+      if (!normalizedPhone.startsWith('+')) {
+        if (normalizedPhone.startsWith('8')) {
+          normalizedPhone = '+7' + normalizedPhone.substring(1)
+        } else if (normalizedPhone.startsWith('7')) {
+          normalizedPhone = '+' + normalizedPhone
+        } else {
+          normalizedPhone = '+7' + normalizedPhone
+        }
+      }
+
+      // Try to find user by phone
+      const response = await fetch(`https://radarbotfront.vercel.app/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      
+      if (response.ok) {
+        onLogin(normalizedPhone)
+        notifications.show({ message: 'Вход выполнен успешно', color: 'green' })
+      } else {
+        notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+      }
+    } catch (error) {
+      notifications.show({ message: 'Ошибка при входе', color: 'red' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Container size="sm" py="xl">
+      <Center>
+        <Card shadow="sm" padding="xl" radius="md" withBorder style={{ width: '100%', maxWidth: 400 }}>
+          <Stack gap="md" align="center">
+            <Avatar size="xl" color="blue" variant="light">
+              <IconPhone size={32} />
+            </Avatar>
+            <Title order={2} ta="center">Вход в Radar портфель</Title>
+            <Text size="sm" c="dimmed" ta="center">
+              Введите номер телефона, который вы использовали при регистрации в боте
+            </Text>
+            
+            <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+              <Stack gap="md">
+                <TextInput
+                  label="Номер телефона"
+                  placeholder="+7 (999) 123-45-67"
+                  value={phone}
+                  onChange={(e) => setPhone(e.currentTarget.value)}
+                  leftSection={<IconPhone size={16} />}
+                  required
+                />
+                <Button
+                  type="submit"
+                  fullWidth
+                  leftSection={<IconLogin size={16} />}
+                  loading={loading}
+                >
+                  Войти
+                </Button>
+              </Stack>
+            </form>
+            
+            <Text size="xs" c="dimmed" ta="center">
+              Если вы еще не регистрировались, отправьте /start боту
+            </Text>
+          </Stack>
+        </Card>
+      </Center>
+    </Container>
+  )
 }
 
 function AccountTabs({ accounts, active, onChange }) {
@@ -613,6 +698,11 @@ export default function App() {
     }
   }, [])
 
+  const [userPhone, setUserPhone] = useState(null)
+  
+  // Check if user is authenticated
+  const isAuthenticated = userPhone || getUserData()
+  
   const { data, loading, error, refresh } = usePortfolio()
   const accounts = useMemo(() => {
     if (!data?.accounts) return []
@@ -674,6 +764,54 @@ export default function App() {
     } catch (err) {
       notifications.show({ message: err.message, color: 'red' })
     }
+  }
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <Stack style={{ minHeight: '100vh' }}>
+        <AppShell
+          padding="md"
+          header={{ height: 64 }}
+          styles={{ main: { backgroundColor: 'var(--mantine-color-body)' } }}
+        >
+          <AppShell.Header
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderBottom: 'none',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <Group justify="center" px="md" py="md">
+              <Group gap="sm" align="center">
+                <Avatar
+                  size="md"
+                  color="white"
+                  variant="filled"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
+                  📊
+                </Avatar>
+                <Stack gap={0}>
+                  <Title order={3} c="white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    Radar портфель
+                  </Title>
+                  <Text size="xs" c="rgba(255,255,255,0.8)">
+                    Вход в систему
+                  </Text>
+                </Stack>
+              </Group>
+            </Group>
+          </AppShell.Header>
+          <AppShell.Main>
+            <LoginForm onLogin={setUserPhone} />
+          </AppShell.Main>
+        </AppShell>
+      </Stack>
+    )
   }
 
   return (

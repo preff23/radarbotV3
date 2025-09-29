@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 23 — Add default data fallback to prevent errors";
+export const MINIAPP_REV = "Правка 24 — Add login form for phone number authentication";
