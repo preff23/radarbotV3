@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 24 — Add login form for phone number authentication";
+export const MINIAPP_REV = "Правка 25 — Add phone confirmation form for detected users";

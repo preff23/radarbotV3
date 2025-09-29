@@ -172,6 +172,110 @@ function usePortfolio() {
   return { data, loading, error, refresh }
 }
 
+function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
+  const [phone, setPhone] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!phone.trim()) return
+
+    setLoading(true)
+    try {
+      // Normalize phone number
+      let normalizedPhone = phone.trim()
+      if (!normalizedPhone.startsWith('+')) {
+        if (normalizedPhone.startsWith('8')) {
+          normalizedPhone = '+7' + normalizedPhone.substring(1)
+        } else if (normalizedPhone.startsWith('7')) {
+          normalizedPhone = '+' + normalizedPhone
+        } else {
+          normalizedPhone = '+7' + normalizedPhone
+        }
+      }
+
+      // Try to find user by phone
+      const response = await fetch(`https://radarbotfront.vercel.app/api/portfolio?phone=${encodeURIComponent(normalizedPhone)}`)
+      
+      if (response.ok) {
+        onConfirm(normalizedPhone)
+        notifications.show({ message: 'Вход выполнен успешно', color: 'green' })
+      } else {
+        notifications.show({ message: 'Пользователь с таким номером не найден. Зарегистрируйтесь в боте.', color: 'red' })
+      }
+    } catch (error) {
+      notifications.show({ message: 'Ошибка при входе', color: 'red' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Container size="sm" py="xl">
+      <Center>
+        <Card shadow="sm" padding="xl" radius="md" withBorder style={{ width: '100%', maxWidth: 400 }}>
+          <Stack gap="md" align="center">
+            <Avatar size="xl" color="blue" variant="light">
+              <IconPhone size={32} />
+            </Avatar>
+            <Title order={2} ta="center">Подтвердите номер телефона</Title>
+            <Text size="sm" c="dimmed" ta="center">
+              Мы определили ваш номер как <Text fw={600} c="blue">{detectedPhone}</Text>
+            </Text>
+            <Text size="sm" c="dimmed" ta="center">
+              Это ваш номер телефона?
+            </Text>
+            
+            <Group gap="md" justify="center">
+              <Button
+                color="green"
+                leftSection={<IconPhone size={16} />}
+                onClick={() => onConfirm(detectedPhone)}
+              >
+                Да, это мой номер
+              </Button>
+              <Button
+                variant="outline"
+                color="red"
+                onClick={onReject}
+              >
+                Нет, другой номер
+              </Button>
+            </Group>
+            
+            <Divider label="Или введите другой номер" labelPosition="center" />
+            
+            <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+              <Stack gap="md">
+                <TextInput
+                  label="Номер телефона"
+                  placeholder="+7 (999) 123-45-67"
+                  value={phone}
+                  onChange={(e) => setPhone(e.currentTarget.value)}
+                  leftSection={<IconPhone size={16} />}
+                  required
+                />
+                <Button
+                  type="submit"
+                  fullWidth
+                  leftSection={<IconLogin size={16} />}
+                  loading={loading}
+                >
+                  Войти с этим номером
+                </Button>
+              </Stack>
+            </form>
+            
+            <Text size="xs" c="dimmed" ta="center">
+              Если вы еще не регистрировались, отправьте /start боту
+            </Text>
+          </Stack>
+        </Card>
+      </Center>
+    </Container>
+  )
+}
+
 function LoginForm({ onLogin }) {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -698,10 +802,21 @@ export default function App() {
     }
   }, [])
 
+  // Check if we need to show phone confirmation
+  useEffect(() => {
+    if (telegramData && !userPhone && !showPhoneConfirmation) {
+      setDetectedPhone(telegramData.phone)
+      setShowPhoneConfirmation(true)
+    }
+  }, [telegramData, userPhone, showPhoneConfirmation])
+
   const [userPhone, setUserPhone] = useState(null)
+  const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
+  const [detectedPhone, setDetectedPhone] = useState(null)
   
   // Check if user is authenticated
-  const isAuthenticated = userPhone || getUserData()
+  const telegramData = getUserData()
+  const isAuthenticated = userPhone || (telegramData && !showPhoneConfirmation)
   
   const { data, loading, error, refresh } = usePortfolio()
   const accounts = useMemo(() => {
@@ -764,6 +879,63 @@ export default function App() {
     } catch (err) {
       notifications.show({ message: err.message, color: 'red' })
     }
+  }
+
+  // Show phone confirmation form if Telegram data is available
+  if (showPhoneConfirmation && detectedPhone) {
+    return (
+      <Stack style={{ minHeight: '100vh' }}>
+        <AppShell
+          padding="md"
+          header={{ height: 64 }}
+          styles={{ main: { backgroundColor: 'var(--mantine-color-body)' } }}
+        >
+          <AppShell.Header
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              borderBottom: 'none',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            }}
+          >
+            <Group justify="center" px="md" py="md">
+              <Group gap="sm" align="center">
+                <Avatar
+                  size="md"
+                  color="white"
+                  variant="filled"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
+                  📊
+                </Avatar>
+                <Stack gap={0}>
+                  <Title order={3} c="white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    Radar портфель
+                  </Title>
+                  <Text size="xs" c="rgba(255,255,255,0.8)">
+                    Подтверждение номера
+                  </Text>
+                </Stack>
+              </Group>
+            </Group>
+          </AppShell.Header>
+          <AppShell.Main>
+            <PhoneConfirmationForm 
+              detectedPhone={detectedPhone}
+              onConfirm={(phone) => {
+                setUserPhone(phone)
+                setShowPhoneConfirmation(false)
+              }}
+              onReject={() => {
+                setShowPhoneConfirmation(false)
+              }}
+            />
+          </AppShell.Main>
+        </AppShell>
+      </Stack>
+    )
   }
 
   // Show login form if not authenticated
