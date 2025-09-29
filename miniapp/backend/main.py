@@ -21,6 +21,9 @@ from bot.utils.bond_reference import load_bond_reference
 class UserContext(BaseModel):
     id: int
     phone_number: str
+    phone: Optional[str] = None
+    telegram_id: Optional[int] = None
+    username: Optional[str] = None
 
 
 class TelegramInitData(BaseModel):
@@ -64,7 +67,14 @@ class AccountResponse(BaseModel):
     cash: List[CashPositionResponse]
 
 
+class UserInfo(BaseModel):
+    phone: Optional[str]
+    telegram_id: Optional[int]
+    username: Optional[str]
+
+
 class PortfolioResponse(BaseModel):
+    user: UserInfo
     accounts: List[AccountResponse]
 
 
@@ -130,10 +140,16 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User is not authorized")
     if not getattr(user, "phone_number", None):
         raise HTTPException(status_code=403, detail="Phone number required")
-    return UserContext(id=user.id, phone_number=user.phone_number)
+    return UserContext(
+        id=user.id,
+        phone_number=user.phone_number,
+        phone=user.phone_number,
+        telegram_id=user.telegram_id,
+        username=user.username
+    )
 
 
-def build_portfolio_response(user_id: int) -> PortfolioResponse:
+def build_portfolio_response(user_id: int, phone: Optional[str] = None, telegram_id: Optional[int] = None, username: Optional[str] = None) -> PortfolioResponse:
     summary = db_manager.get_user_portfolio_summary(user_id)
 
     accounts_index: Dict[Optional[int], AccountResponse] = {}
@@ -200,12 +216,13 @@ def build_portfolio_response(user_id: int) -> PortfolioResponse:
         )
         target_account.cash.append(cash_resp)
 
-    return PortfolioResponse(accounts=accounts_response)
+    user_info = UserInfo(phone=phone, telegram_id=telegram_id, username=username)
+    return PortfolioResponse(user=user_info, accounts=accounts_response)
 
 
 @app.get("/api/portfolio", response_model=PortfolioResponse)
 def get_portfolio(user: UserContext = Depends(get_current_user)) -> PortfolioResponse:
-    return build_portfolio_response(user.id)
+    return build_portfolio_response(user.id, user.phone, user.telegram_id, user.username)
 
 
 def build_search_result(snapshot: MarketSnapshot) -> SearchResult:
