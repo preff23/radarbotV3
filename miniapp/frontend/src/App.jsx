@@ -57,7 +57,23 @@ function getUserData() {
     throw new Error('Telegram WebApp not available. Please open this app from Telegram.')
   }
 
-  const user = tg.initDataUnsafe?.user
+  // Try to get user data from different sources
+  let user = tg.initDataUnsafe?.user
+  
+  // If no user in initDataUnsafe, try to parse initData manually
+  if (!user && tg.initData) {
+    try {
+      const urlParams = new URLSearchParams(tg.initData)
+      const userParam = urlParams.get('user')
+      if (userParam) {
+        user = JSON.parse(decodeURIComponent(userParam))
+        console.log('Parsed user from initData:', user)
+      }
+    } catch (e) {
+      console.error('Error parsing initData:', e)
+    }
+  }
+
   if (!user) {
     throw new Error('No user data in Telegram WebApp. Please make sure you opened this app from Telegram.')
   }
@@ -583,6 +599,17 @@ function EditPositionModal({ opened, onClose, position, onSubmit }) {
 }
 
 export default function App() {
+  // Initialize Telegram WebApp
+  useEffect(() => {
+    const tg = window?.Telegram?.WebApp
+    if (tg) {
+      console.log('Initializing Telegram WebApp...')
+      tg.ready()
+      tg.expand()
+      console.log('Telegram WebApp initialized')
+    }
+  }, [])
+
   const { data, loading, error, refresh } = usePortfolio()
   const accounts = useMemo(() => {
     if (!data?.accounts) return []
