@@ -143,11 +143,14 @@ def get_current_user(
         user = db_manager.get_user_by_username('offline_test')
         if user:
             print(f'Found offline_test user: ID={user.id}, phone={user.phone_number}')
-    elif telegram_id:
-        user = db_manager.get_user_by_telegram_id(telegram_id)
-    
-    if not user and phone_number:
+    elif phone_number:
+        # Priority 1: Search by phone number (most reliable for multi-user)
         user = db_manager.get_user_by_phone(phone_number)
+        print(f'Searching by phone: {phone_number}')
+    elif telegram_id:
+        # Priority 2: Search by telegram_id (fallback)
+        user = db_manager.get_user_by_telegram_id(telegram_id)
+        print(f'Searching by telegram_id: {telegram_id}')
     
     if not user:
         raise HTTPException(status_code=401, detail="User is not authorized")
