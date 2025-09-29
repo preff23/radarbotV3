@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 31 — Add debug logging for login issues";
+export const MINIAPP_REV = "Правка 32 — Use local backend for testing";
