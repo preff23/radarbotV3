@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 28 — Connect to server backend instead of local";
+export const MINIAPP_REV = "Правка 29 — Fix Vercel proxy to correct server IP";

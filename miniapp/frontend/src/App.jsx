@@ -112,7 +112,7 @@ async function apiRequest(path, options = {}) {
     try { tg.ready(); } catch (_) {} 
   }
   
-  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : 'https://89.169.170.241:8000');
+  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : '');
   const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const url = new URL((base || "") + apiPath, window.location.origin);
   
