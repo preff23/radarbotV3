@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 16 — Use real user ID";
+export const MINIAPP_REV = "Правка 17 — Beautiful design with cards and animations";

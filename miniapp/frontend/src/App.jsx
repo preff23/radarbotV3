@@ -6,6 +6,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Group,
   Loader,
   Modal,
@@ -14,13 +15,18 @@ import {
   Select,
   SegmentedControl,
   Stack,
-  Table,
   Text,
   TextInput,
   Title,
+  Transition,
+  Paper,
+  Divider,
+  Tooltip,
+  Avatar,
+  Progress,
 } from '@mantine/core'
 import { Notifications, notifications } from '@mantine/notifications'
-import { IconPlus, IconTrash, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus } from '@tabler/icons-react'
 import './App.css'
 import { MINIAPP_REV } from './version' 
 
@@ -119,53 +125,192 @@ function AccountTabs({ accounts, active, onChange }) {
 
 function PortfolioTable({ account, onEdit, onDelete }) {
   if (!account) {
-    return <Text>Портфель пуст</Text>
+    return (
+      <Paper p="xl" radius="md" style={{ textAlign: 'center' }}>
+        <Stack gap="md">
+          <Avatar size="xl" color="gray" variant="light">
+            <IconMinus size={32} />
+          </Avatar>
+          <Text size="lg" fw={500} c="dimmed">Портфель пуст</Text>
+          <Text size="sm" c="dimmed">Добавьте ценные бумаги для начала работы</Text>
+        </Stack>
+      </Paper>
+    )
   }
 
-  const rows = account.positions.map((position) => (
-    <Table.Tr key={position.id}>
-      <Table.Td>
-        <Stack gap={2}>
-          <Text fw={500}>{position.name}</Text>
-          <Group gap="xs">
-            {position.ticker && <Badge variant="light" color="blue">{position.ticker}</Badge>}
-            {position.isin && <Badge variant="light" color="gray">{position.isin}</Badge>}
-            {position.fallback && <Badge variant="light" color="yellow">Справочник</Badge>}
-          </Group>
-        </Stack>
-      </Table.Td>
-      <Table.Td>{position.security_type || '—'}</Table.Td>
-      <Table.Td>{position.quantity ?? '—'}</Table.Td>
-      <Table.Td>{position.quantity_unit || 'шт'}</Table.Td>
-      <Table.Td>{position.provider || '—'}</Table.Td>
-      <Table.Td>
-        <Group gap="xs">
-          <Button size="xs" variant="light" onClick={() => onEdit(position)}>
-            Изменить
-          </Button>
-          <ActionIcon variant="light" color="red" onClick={() => onDelete(position)}>
-            <IconTrash size={16} />
-          </ActionIcon>
-        </Group>
-      </Table.Td>
-    </Table.Tr>
-  ))
+  const getSecurityIcon = (type) => {
+    switch (type?.toLowerCase()) {
+      case 'bond': return '📈'
+      case 'stock': return '📊'
+      case 'etf': return '📋'
+      default: return '💼'
+    }
+  }
+
+  const getSecurityColor = (type) => {
+    switch (type?.toLowerCase()) {
+      case 'bond': return 'blue'
+      case 'stock': return 'green'
+      case 'etf': return 'purple'
+      default: return 'gray'
+    }
+  }
 
   return (
-    <ScrollArea>
-      <Table striped highlightOnHover withTableBorder>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Бумага</Table.Th>
-            <Table.Th>Тип</Table.Th>
-            <Table.Th>Количество</Table.Th>
-            <Table.Th>Ед.</Table.Th>
-            <Table.Th>Источник</Table.Th>
-            <Table.Th>Действия</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>{rows}</Table.Tbody>
-      </Table>
+    <ScrollArea style={{ height: '60vh' }}>
+      <Stack gap="sm">
+        {account.positions.map((position, index) => (
+          <Transition
+            key={position.id}
+            mounted={true}
+            transition="slide-right"
+            duration={300}
+            timingFunction="ease-out"
+            style={{ transitionDelay: `${index * 50}ms` }}
+          >
+            {(styles) => (
+              <Card
+                key={position.id}
+                shadow="sm"
+                padding="md"
+                radius="md"
+                withBorder
+                style={{
+                  ...styles,
+                  background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                  border: '1px solid #e9ecef',
+                  transition: 'all 0.2s ease',
+                  cursor: 'pointer',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'
+                }}
+              >
+                <Group justify="space-between" align="flex-start">
+                  <Group gap="md" style={{ flex: 1, minWidth: 0 }}>
+                    <Avatar
+                      size="lg"
+                      color={getSecurityColor(position.security_type)}
+                      variant="light"
+                      style={{ fontSize: '20px' }}
+                    >
+                      {getSecurityIcon(position.security_type)}
+                    </Avatar>
+                    <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        fw={600}
+                        size="md"
+                        style={{
+                          lineHeight: 1.2,
+                          wordBreak: 'break-word',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}
+                      >
+                        {position.name}
+                      </Text>
+                      <Group gap="xs" wrap="wrap">
+                        {position.ticker && (
+                          <Badge
+                            variant="light"
+                            color="blue"
+                            size="sm"
+                            style={{ fontSize: '11px' }}
+                          >
+                            {position.ticker}
+                          </Badge>
+                        )}
+                        {position.isin && (
+                          <Tooltip label={position.isin}>
+                            <Badge
+                              variant="light"
+                              color="gray"
+                              size="sm"
+                              style={{ fontSize: '10px', maxWidth: '80px' }}
+                            >
+                              {position.isin.substring(0, 8)}...
+                            </Badge>
+                          </Tooltip>
+                        )}
+                        {position.fallback && (
+                          <Badge variant="light" color="yellow" size="sm">
+                            Справочник
+                          </Badge>
+                        )}
+                      </Group>
+                    </Stack>
+                  </Group>
+                  
+                  <Stack gap="xs" align="flex-end">
+                    <Group gap="xs">
+                      <Text fw={700} size="lg" c="teal">
+                        {position.quantity ?? '—'}
+                      </Text>
+                      <Text size="sm" c="dimmed">
+                        {position.quantity_unit || 'шт'}
+                      </Text>
+                    </Group>
+                    <Group gap="xs">
+                      <Tooltip label="Редактировать">
+                        <ActionIcon
+                          variant="light"
+                          color="blue"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEdit(position)
+                          }}
+                        >
+                          <IconEdit size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                      <Tooltip label="Удалить">
+                        <ActionIcon
+                          variant="light"
+                          color="red"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onDelete(position)
+                          }}
+                        >
+                          <IconTrash size={14} />
+                        </ActionIcon>
+                      </Tooltip>
+                    </Group>
+                  </Stack>
+                </Group>
+                
+                {position.provider && (
+                  <>
+                    <Divider my="xs" />
+                    <Group justify="space-between" align="center">
+                      <Text size="xs" c="dimmed">
+                        Источник: {position.provider}
+                      </Text>
+                      <Badge
+                        variant="light"
+                        color={getSecurityColor(position.security_type)}
+                        size="xs"
+                      >
+                        {position.security_type || 'неизвестно'}
+                      </Badge>
+                    </Group>
+                  </>
+                )}
+              </Card>
+            )}
+          </Transition>
+        ))}
+      </Stack>
     </ScrollArea>
   )
 }
@@ -460,28 +605,71 @@ export default function App() {
         header={{ height: 64 }}
         styles={{ main: { backgroundColor: 'var(--mantine-color-body)' } }}
       >
-        <AppShell.Header>
-          <Group justify="space-between" px="md" py="sm">
-            <Stack gap={0}>
-              <Title order={3}>Radar портфель</Title>
-              <Text size="xs" c="dimmed">
-                {data?.user ? `Аккаунт: ${data.user.phone || data.user.telegram_id || 'не определен'}` : 'Загрузка...'}
-              </Text>
+        <AppShell.Header
+          style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            borderBottom: 'none',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          }}
+        >
+          <Group justify="space-between" px="md" py="md">
+            <Stack gap={4}>
+              <Group gap="sm" align="center">
+                <Avatar
+                  size="md"
+                  color="white"
+                  variant="filled"
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                  }}
+                >
+                  📊
+                </Avatar>
+                <Stack gap={0}>
+                  <Title order={3} c="white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                    Radar портфель
+                  </Title>
+                  <Text size="xs" c="rgba(255,255,255,0.8)">
+                    {data?.user ? `Аккаунт: ${data.user.phone || data.user.telegram_id || 'не определен'}` : 'Загрузка...'}
+                  </Text>
+                </Stack>
+              </Group>
             </Stack>
-            <Group>
-              <Button
-                variant="light"
-                leftSection={<IconRefresh size={16} />}
-                onClick={refresh}
-              >
-                Обновить
-              </Button>
-              <Button
-                leftSection={<IconPlus size={16} />}
-                onClick={() => setAddOpened(true)}
-              >
-                Добавить
-              </Button>
+            <Group gap="sm">
+              <Tooltip label="Обновить данные">
+                <Button
+                  variant="white"
+                  color="dark"
+                  size="sm"
+                  leftSection={<IconRefresh size={16} />}
+                  onClick={refresh}
+                  style={{
+                    background: 'rgba(255,255,255,0.9)',
+                    backdropFilter: 'blur(10px)',
+                    border: 'none',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  Обновить
+                </Button>
+              </Tooltip>
+              <Tooltip label="Добавить ценную бумагу">
+                <Button
+                  size="sm"
+                  leftSection={<IconPlus size={16} />}
+                  onClick={() => setAddOpened(true)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                  }}
+                >
+                  Добавить
+                </Button>
+              </Tooltip>
             </Group>
           </Group>
         </AppShell.Header>
@@ -506,15 +694,60 @@ export default function App() {
                   onChange={setActiveAccount}
                 />
                 {currentAccount ? (
-                  <Stack gap="sm">
-                    <Group justify="space-between">
-                      <Stack gap={0}>
-                        <Text fw={600}>{currentAccount.account_name || 'Портфель'}</Text>
-                        <Text size="sm" c="dimmed">
-                          {currentAccount.currency || '—'} · {currentAccount.positions.length} бумаг
-                        </Text>
-                      </Stack>
-                    </Group>
+                  <Stack gap="md">
+                    <Card
+                      shadow="sm"
+                      padding="lg"
+                      radius="md"
+                      withBorder
+                      style={{
+                        background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
+                        border: '1px solid #e9ecef',
+                      }}
+                    >
+                      <Group justify="space-between" align="center">
+                        <Group gap="md">
+                          <Avatar
+                            size="lg"
+                            color="teal"
+                            variant="light"
+                            style={{ fontSize: '24px' }}
+                          >
+                            💼
+                          </Avatar>
+                          <Stack gap={4}>
+                            <Text fw={700} size="xl" c="dark">
+                              {currentAccount.account_name || 'Портфель'}
+                            </Text>
+                            <Group gap="md">
+                              <Badge
+                                variant="light"
+                                color="teal"
+                                size="lg"
+                                leftSection={<IconTrendingUp size={14} />}
+                              >
+                                {currentAccount.currency || 'RUB'}
+                              </Badge>
+                              <Badge
+                                variant="light"
+                                color="blue"
+                                size="lg"
+                              >
+                                {currentAccount.positions.length} бумаг
+                              </Badge>
+                            </Group>
+                          </Stack>
+                        </Group>
+                        {currentAccount.portfolio_value && (
+                          <Stack gap={4} align="flex-end">
+                            <Text size="xs" c="dimmed">Общая стоимость</Text>
+                            <Text fw={700} size="lg" c="teal">
+                              {currentAccount.portfolio_value.toLocaleString()} ₽
+                            </Text>
+                          </Stack>
+                        )}
+                      </Group>
+                    </Card>
                     <PortfolioTable
                       account={currentAccount}
                       onEdit={(pos) => setEditTarget(pos)}
@@ -522,7 +755,21 @@ export default function App() {
                     />
                   </Stack>
                 ) : (
-                  <Text>Портфель пуст</Text>
+                  <Card
+                    shadow="sm"
+                    padding="xl"
+                    radius="md"
+                    withBorder
+                    style={{ textAlign: 'center' }}
+                  >
+                    <Stack gap="md">
+                      <Avatar size="xl" color="gray" variant="light">
+                        <IconMinus size={32} />
+                      </Avatar>
+                      <Text size="lg" fw={500} c="dimmed">Портфель пуст</Text>
+                      <Text size="sm" c="dimmed">Добавьте ценные бумаги для начала работы</Text>
+                    </Stack>
+                  </Card>
                 )}
               </Stack>
             )}
