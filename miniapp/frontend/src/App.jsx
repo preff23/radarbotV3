@@ -36,33 +36,30 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
 function getUserData() {
   const tg = window?.Telegram?.WebApp
   if (!tg) {
-    console.warn('Telegram WebApp not available, using fallback data')
-    return {
-      telegram_id: '521751895', // Fallback for development
-      phone: '+79150749227', // Your actual phone
-      username: 'goretofff'
-    }
+    console.warn('Telegram WebApp not available')
+    return null // Don't use fallback data in production
   }
 
   const user = tg.initDataUnsafe?.user
   if (!user) {
     console.warn('No user data in Telegram WebApp')
-    return {
-      telegram_id: '521751895',
-      phone: '+79150749227',
-      username: 'goretofff'
-    }
+    return null // Don't use fallback data in production
   }
 
   return {
     telegram_id: String(user.id),
-    phone: user.phone_number || '+79150749227',
+    phone: user.phone_number,
     username: user.username || 'user'
   }
 }
 
 async function apiRequest(path, options = {}) {
   const userData = getUserData()
+  
+  if (!userData) {
+    throw new Error('User data not available. Please open this app from Telegram.')
+  }
+  
   const headers = new Headers(options.headers || {})
   
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
