@@ -791,6 +791,21 @@ function EditPositionModal({ opened, onClose, position, onSubmit }) {
 }
 
 export default function App() {
+  const [userPhone, setUserPhone] = useState(null)
+  const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
+  const [detectedPhone, setDetectedPhone] = useState(null)
+
+  const handleLogout = () => {
+    setUserPhone(null)
+    setShowPhoneConfirmation(false)
+    setDetectedPhone(null)
+    notifications.show({ message: 'Вы вышли из профиля', color: 'blue' })
+  }
+  
+  // Check if user is authenticated
+  const telegramData = getUserData()
+  const isAuthenticated = userPhone || (telegramData && !showPhoneConfirmation)
+
   // Initialize Telegram WebApp
   useEffect(() => {
     const tg = window?.Telegram?.WebApp
@@ -809,21 +824,6 @@ export default function App() {
       setShowPhoneConfirmation(true)
     }
   }, [telegramData, userPhone, showPhoneConfirmation])
-
-  const [userPhone, setUserPhone] = useState(null)
-  const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
-  const [detectedPhone, setDetectedPhone] = useState(null)
-
-  const handleLogout = () => {
-    setUserPhone(null)
-    setShowPhoneConfirmation(false)
-    setDetectedPhone(null)
-    notifications.show({ message: 'Вы вышли из профиля', color: 'blue' })
-  }
-  
-  // Check if user is authenticated
-  const telegramData = getUserData()
-  const isAuthenticated = userPhone || (telegramData && !showPhoneConfirmation)
   
   const { data, loading, error, refresh } = usePortfolio()
   const accounts = useMemo(() => {
