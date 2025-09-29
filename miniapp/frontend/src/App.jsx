@@ -24,8 +24,9 @@ import { IconPlus, IconTrash, IconRefresh, IconSearch } from '@tabler/icons-reac
 import './App.css'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
-const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID || '1'
-const DEV_PHONE = import.meta.env.VITE_DEV_PHONE || ''
+// Use real telegram_id from WebApp or fallback to your ID
+const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID || '521751895'
+const DEV_PHONE = import.meta.env.VITE_DEV_PHONE || '+79151731545'
 
 async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {})

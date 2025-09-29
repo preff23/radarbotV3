@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -109,10 +109,19 @@ app.add_middleware(
 
 
 def get_current_user(
+    request: Request,
     telegram_id: Optional[int] = Header(None, alias="X-Telegram-Id"),
     phone_number: Optional[str] = Header(None, alias="X-User-Phone")
 ) -> UserContext:
     user = None
+    # Fallback: allow tg_id query parameter when headers are stripped by a proxy (e.g., Vercel rewrites)
+    try:
+        if telegram_id in (None, 0):
+            tg_q = request.query_params.get("tg_id")
+            if tg_q and tg_q.isdigit():
+                telegram_id = int(tg_q)
+    except Exception:
+        pass
     if telegram_id:
         user = db_manager.get_user_by_telegram_id(telegram_id)
     if not user and phone_number:
