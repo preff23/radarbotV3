@@ -22,11 +22,12 @@ import {
 import { Notifications, notifications } from '@mantine/notifications'
 import { IconPlus, IconTrash, IconRefresh, IconSearch } from '@tabler/icons-react'
 import './App.css'
+import { MINIAPP_REV } from './version' 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
 // Use real telegram_id from WebApp or fallback to your ID
-const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID || '521751895'
-const DEV_PHONE = import.meta.env.VITE_DEV_PHONE || '+79151731545'
+const DEV_TELEGRAM_ID = '521751895'
+const DEV_PHONE = '+79151731545'
 
 async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {})
@@ -39,13 +40,25 @@ async function apiRequest(path, options = {}) {
   if (!headers.has('X-User-Phone') && DEV_PHONE) {
     headers.set('X-User-Phone', DEV_PHONE)
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const tg = (window?.Telegram)?.WebApp;
+  const tgId = tg?.initDataUnsafe?.user?.id;
+  const usedId = tgId || DEV_TELEGRAM_ID;
+  if (!headers.has('X-Telegram-Id') && tgId) {
+    headers.set('X-Telegram-Id', String(tgId));
+  }
+  if (tg && typeof tg.ready === 'function') { try { tg.ready(); } catch (_) {} }
+  const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : '');
+  const apiPath = path.startsWith("/api") ? path : `/api${path}`;
+  const url = new URL((base || "") + apiPath, window.location.origin);
+  try { url.searchParams.set('tg_id', String(usedId)); } catch (_) {}
+  window.__LAST_API_URL__ = url.toString();
+  const response = await fetch(url.toString(), {
     ...options,
     headers,
   })
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(text || 'API request failed')
+    throw new Error(`${text || 'API request failed'} [${response.status}] ${url?.toString?.() || ''}`)
   }
   if (response.status === 204) {
     return null
@@ -449,7 +462,12 @@ export default function App() {
       >
         <AppShell.Header>
           <Group justify="space-between" px="md" py="sm">
-            <Title order={3}>Radar портфель</Title>
+            <Stack gap={0}>
+              <Title order={3}>Radar портфель</Title>
+              <Text size="xs" c="dimmed">
+                {data?.user ? `Аккаунт: ${data.user.phone || data.user.telegram_id || 'не определен'}` : 'Загрузка...'}
+              </Text>
+            </Stack>
             <Group>
               <Button
                 variant="light"
