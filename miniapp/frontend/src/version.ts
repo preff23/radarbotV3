@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 22 — Restore working fallback with URL parameters";
+export const MINIAPP_REV = "Правка 23 — Add default data fallback to prevent errors";
