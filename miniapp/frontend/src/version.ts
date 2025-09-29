@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 21 — Fix Telegram WebApp initialization and data parsing";
+export const MINIAPP_REV = "Правка 22 — Restore working fallback with URL parameters";

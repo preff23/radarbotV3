@@ -40,28 +40,14 @@ function getUserData() {
   console.log('initDataUnsafe:', tg?.initDataUnsafe)
   console.log('user:', tg?.initDataUnsafe?.user)
   console.log('initData:', tg?.initData)
-  console.log('version:', tg?.version)
-  console.log('platform:', tg?.platform)
-  console.log('colorScheme:', tg?.colorScheme)
-  console.log('isExpanded:', tg?.isExpanded)
-  console.log('viewportHeight:', tg?.viewportHeight)
-  console.log('viewportStableHeight:', tg?.viewportStableHeight)
-  console.log('headerColor:', tg?.headerColor)
-  console.log('backgroundColor:', tg?.backgroundColor)
-  console.log('isClosingConfirmationEnabled:', tg?.isClosingConfirmationEnabled)
-  console.log('isVerticalSwipesEnabled:', tg?.isVerticalSwipesEnabled)
-  console.log('isHorizontalSwipesEnabled:', tg?.isHorizontalSwipesEnabled)
   console.log('================================')
   
-  if (!tg) {
-    throw new Error('Telegram WebApp not available. Please open this app from Telegram.')
-  }
-
-  // Try to get user data from different sources
-  let user = tg.initDataUnsafe?.user
-  
-  // If no user in initDataUnsafe, try to parse initData manually
-  if (!user && tg.initData) {
+  // Try to get user data from Telegram WebApp
+  let user = null
+  if (tg?.initDataUnsafe?.user) {
+    user = tg.initDataUnsafe.user
+    console.log('Using initDataUnsafe.user:', user)
+  } else if (tg?.initData) {
     try {
       const urlParams = new URLSearchParams(tg.initData)
       const userParam = urlParams.get('user')
@@ -74,19 +60,31 @@ function getUserData() {
     }
   }
 
-  if (!user) {
-    throw new Error('No user data in Telegram WebApp. Please make sure you opened this app from Telegram.')
+  // If we have user data from Telegram, use it
+  if (user && user.id) {
+    return {
+      telegram_id: String(user.id),
+      phone: user.phone_number || null,
+      username: user.username || 'user'
+    }
   }
 
-  if (!user.phone_number) {
-    throw new Error('Phone number not available. Please make sure your phone number is visible in Telegram settings.')
+  // Fallback: use data from URL parameters or default
+  const urlParams = new URLSearchParams(window.location.search)
+  const tgId = urlParams.get('tg_id') || urlParams.get('telegram_id')
+  const phone = urlParams.get('phone') || urlParams.get('phone_number')
+  
+  if (tgId && phone) {
+    console.log('Using URL parameters:', { tgId, phone })
+    return {
+      telegram_id: String(tgId),
+      phone: phone,
+      username: 'user'
+    }
   }
 
-  return {
-    telegram_id: String(user.id),
-    phone: user.phone_number,
-    username: user.username || 'user'
-  }
+  // Last resort: throw error
+  throw new Error('User data not available. Please open this app from Telegram.')
 }
 
 async function apiRequest(path, options = {}) {
