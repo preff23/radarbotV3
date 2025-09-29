@@ -182,17 +182,35 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
 
     setLoading(true)
     try {
-      // Normalize phone number
-      let normalizedPhone = phone.trim()
-      if (!normalizedPhone.startsWith('+')) {
-        if (normalizedPhone.startsWith('8')) {
-          normalizedPhone = '+7' + normalizedPhone.substring(1)
-        } else if (normalizedPhone.startsWith('7')) {
-          normalizedPhone = '+' + normalizedPhone
+      // Normalize phone number - remove all non-digits first
+      let digitsOnly = phone.replace(/\D/g, '')
+      
+      // Handle different formats
+      if (digitsOnly.length === 10) {
+        // 9151731545 -> +79151731545
+        normalizedPhone = '+7' + digitsOnly
+      } else if (digitsOnly.length === 11) {
+        if (digitsOnly.startsWith('8')) {
+          // 89151731545 -> +79151731545
+          normalizedPhone = '+7' + digitsOnly.substring(1)
+        } else if (digitsOnly.startsWith('7')) {
+          // 79151731545 -> +79151731545
+          normalizedPhone = '+' + digitsOnly
         } else {
-          normalizedPhone = '+7' + normalizedPhone
+          // Other 11 digits -> +7 + digits
+          normalizedPhone = '+7' + digitsOnly
         }
+      } else if (digitsOnly.length === 9) {
+        // 915173154 -> +7915173154 (incomplete number, but let's try)
+        normalizedPhone = '+7' + digitsOnly
+      } else {
+        // Fallback - just add +7
+        normalizedPhone = '+7' + digitsOnly
       }
+      
+      console.log('Original phone:', phone)
+      console.log('Digits only:', digitsOnly)
+      console.log('Normalized phone:', normalizedPhone)
 
       // Try to find user by phone
       console.log('Trying to login with phone:', normalizedPhone)
@@ -259,10 +277,11 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
               <Stack gap="md">
                 <TextInput
                   label="Номер телефона"
-                  placeholder="+7 (999) 123-45-67"
+                  placeholder="8 915 173 15 45 или +79151731545"
                   value={phone}
                   onChange={(e) => setPhone(e.currentTarget.value)}
                   leftSection={<IconPhone size={16} />}
+                  description="Принимаются любые форматы: 8 915 173 15 45, 79151731545, +79151731545"
                   required
                 />
                 <Button
@@ -296,17 +315,35 @@ function LoginForm({ onLogin }) {
 
     setLoading(true)
     try {
-      // Normalize phone number
-      let normalizedPhone = phone.trim()
-      if (!normalizedPhone.startsWith('+')) {
-        if (normalizedPhone.startsWith('8')) {
-          normalizedPhone = '+7' + normalizedPhone.substring(1)
-        } else if (normalizedPhone.startsWith('7')) {
-          normalizedPhone = '+' + normalizedPhone
+      // Normalize phone number - remove all non-digits first
+      let digitsOnly = phone.replace(/\D/g, '')
+      
+      // Handle different formats
+      if (digitsOnly.length === 10) {
+        // 9151731545 -> +79151731545
+        normalizedPhone = '+7' + digitsOnly
+      } else if (digitsOnly.length === 11) {
+        if (digitsOnly.startsWith('8')) {
+          // 89151731545 -> +79151731545
+          normalizedPhone = '+7' + digitsOnly.substring(1)
+        } else if (digitsOnly.startsWith('7')) {
+          // 79151731545 -> +79151731545
+          normalizedPhone = '+' + digitsOnly
         } else {
-          normalizedPhone = '+7' + normalizedPhone
+          // Other 11 digits -> +7 + digits
+          normalizedPhone = '+7' + digitsOnly
         }
+      } else if (digitsOnly.length === 9) {
+        // 915173154 -> +7915173154 (incomplete number, but let's try)
+        normalizedPhone = '+7' + digitsOnly
+      } else {
+        // Fallback - just add +7
+        normalizedPhone = '+7' + digitsOnly
       }
+      
+      console.log('Original phone:', phone)
+      console.log('Digits only:', digitsOnly)
+      console.log('Normalized phone:', normalizedPhone)
 
       // Try to find user by phone
       console.log('Trying to login with phone:', normalizedPhone)
@@ -351,10 +388,11 @@ function LoginForm({ onLogin }) {
               <Stack gap="md">
                 <TextInput
                   label="Номер телефона"
-                  placeholder="+7 (999) 123-45-67"
+                  placeholder="8 915 173 15 45 или +79151731545"
                   value={phone}
                   onChange={(e) => setPhone(e.currentTarget.value)}
                   leftSection={<IconPhone size={16} />}
+                  description="Принимаются любые форматы: 8 915 173 15 45, 79151731545, +79151731545"
                   required
                 />
                 <Button
