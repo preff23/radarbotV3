@@ -35,15 +35,35 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
 // Get real user data from Telegram WebApp
 function getUserData() {
   const tg = window?.Telegram?.WebApp
+  console.log('=== Telegram WebApp Debug ===')
+  console.log('Telegram WebApp object:', tg)
+  console.log('initDataUnsafe:', tg?.initDataUnsafe)
+  console.log('user:', tg?.initDataUnsafe?.user)
+  console.log('initData:', tg?.initData)
+  console.log('version:', tg?.version)
+  console.log('platform:', tg?.platform)
+  console.log('colorScheme:', tg?.colorScheme)
+  console.log('isExpanded:', tg?.isExpanded)
+  console.log('viewportHeight:', tg?.viewportHeight)
+  console.log('viewportStableHeight:', tg?.viewportStableHeight)
+  console.log('headerColor:', tg?.headerColor)
+  console.log('backgroundColor:', tg?.backgroundColor)
+  console.log('isClosingConfirmationEnabled:', tg?.isClosingConfirmationEnabled)
+  console.log('isVerticalSwipesEnabled:', tg?.isVerticalSwipesEnabled)
+  console.log('isHorizontalSwipesEnabled:', tg?.isHorizontalSwipesEnabled)
+  console.log('================================')
+  
   if (!tg) {
-    console.warn('Telegram WebApp not available')
-    return null // Don't use fallback data in production
+    throw new Error('Telegram WebApp not available. Please open this app from Telegram.')
   }
 
   const user = tg.initDataUnsafe?.user
   if (!user) {
-    console.warn('No user data in Telegram WebApp')
-    return null // Don't use fallback data in production
+    throw new Error('No user data in Telegram WebApp. Please make sure you opened this app from Telegram.')
+  }
+
+  if (!user.phone_number) {
+    throw new Error('Phone number not available. Please make sure your phone number is visible in Telegram settings.')
   }
 
   return {
@@ -55,11 +75,6 @@ function getUserData() {
 
 async function apiRequest(path, options = {}) {
   const userData = getUserData()
-  
-  if (!userData) {
-    throw new Error('User data not available. Please open this app from Telegram.')
-  }
-  
   const headers = new Headers(options.headers || {})
   
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
