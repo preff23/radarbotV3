@@ -1,1 +1,1 @@
-export const MINIAPP_REV = "Правка 17 — Beautiful design with cards and animations";
+export const MINIAPP_REV = "Правка 18 — Multi-user support with real Telegram data";

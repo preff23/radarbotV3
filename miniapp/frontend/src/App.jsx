@@ -31,44 +31,80 @@ import './App.css'
 import { MINIAPP_REV } from './version' 
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
-// Use real telegram_id from WebApp or fallback to your ID
-const DEV_TELEGRAM_ID = '521751895'
-const DEV_PHONE = '+79151731545'
+
+// Get real user data from Telegram WebApp
+function getUserData() {
+  const tg = window?.Telegram?.WebApp
+  if (!tg) {
+    console.warn('Telegram WebApp not available, using fallback data')
+    return {
+      telegram_id: '521751895', // Fallback for development
+      phone: '+79150749227', // Your actual phone
+      username: 'goretofff'
+    }
+  }
+
+  const user = tg.initDataUnsafe?.user
+  if (!user) {
+    console.warn('No user data in Telegram WebApp')
+    return {
+      telegram_id: '521751895',
+      phone: '+79150749227',
+      username: 'goretofff'
+    }
+  }
+
+  return {
+    telegram_id: String(user.id),
+    phone: user.phone_number || '+79150749227',
+    username: user.username || 'user'
+  }
+}
 
 async function apiRequest(path, options = {}) {
+  const userData = getUserData()
   const headers = new Headers(options.headers || {})
+  
   if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
   }
-  if (!headers.has('X-Telegram-Id') && DEV_TELEGRAM_ID) {
-    headers.set('X-Telegram-Id', DEV_TELEGRAM_ID)
+  
+  // Always use real user data
+  headers.set('X-Telegram-Id', userData.telegram_id)
+  headers.set('X-User-Phone', userData.phone)
+  
+  const tg = window?.Telegram?.WebApp
+  if (tg && typeof tg.ready === 'function') { 
+    try { tg.ready(); } catch (_) {} 
   }
-  if (!headers.has('X-User-Phone') && DEV_PHONE) {
-    headers.set('X-User-Phone', DEV_PHONE)
-  }
-  const tg = (window?.Telegram)?.WebApp;
-  const tgId = tg?.initDataUnsafe?.user?.id;
-  const usedId = tgId || DEV_TELEGRAM_ID;
-  if (!headers.has('X-Telegram-Id') && tgId) {
-    headers.set('X-Telegram-Id', String(tgId));
-  }
-  if (tg && typeof tg.ready === 'function') { try { tg.ready(); } catch (_) {} }
+  
   const base = (API_BASE_URL && !API_BASE_URL.startsWith('http:') ? API_BASE_URL : '');
   const apiPath = path.startsWith("/api") ? path : `/api${path}`;
   const url = new URL((base || "") + apiPath, window.location.origin);
-  try { url.searchParams.set('tg_id', String(usedId)); } catch (_) {}
+  
+  // Add user data to query params for proxy compatibility
+  try { 
+    url.searchParams.set('tg_id', userData.telegram_id)
+    url.searchParams.set('phone', userData.phone)
+  } catch (_) {}
+  
   window.__LAST_API_URL__ = url.toString();
+  window.__USER_DATA__ = userData; // For debugging
+  
   const response = await fetch(url.toString(), {
     ...options,
     headers,
   })
+  
   if (!response.ok) {
     const text = await response.text()
     throw new Error(`${text || 'API request failed'} [${response.status}] ${url?.toString?.() || ''}`)
   }
+  
   if (response.status === 204) {
     return null
   }
+  
   return response.json()
 }
 

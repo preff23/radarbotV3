@@ -124,13 +124,19 @@ def get_current_user(
     phone_number: Optional[str] = Header(None, alias="X-User-Phone")
 ) -> UserContext:
     user = None
-    # Fallback: allow tg_id query parameter when headers are stripped by a proxy (e.g., Vercel rewrites)
+    # Fallback: allow tg_id and phone query parameters when headers are stripped by a proxy (e.g., Vercel rewrites)
     tg_q = request.query_params.get("tg_id")
+    phone_q = request.query_params.get("phone")
+    
     try:
         if telegram_id in (None, 0) and tg_q and tg_q.isdigit():
             telegram_id = int(tg_q)
     except Exception:
         pass
+    
+    # Use phone from query params if header is not available
+    if not phone_number and phone_q:
+        phone_number = phone_q
     
     # Handle special case for offline_test user
     if tg_q == 'offline_test':
@@ -147,6 +153,8 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User is not authorized")
     if not getattr(user, "phone_number", None):
         raise HTTPException(status_code=403, detail="Phone number required")
+    
+    print(f'Found user: ID={user.id}, phone={user.phone_number}, telegram_id={user.telegram_id}')
     return UserContext(
         id=user.id,
         phone_number=user.phone_number,
