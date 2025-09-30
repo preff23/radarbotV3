@@ -430,7 +430,7 @@ async def get_payment_calendar(
                                 "isin": holding.isin,
                                 "amount": snapshot.coupon_value or 0,
                                 "currency": snapshot.currency or "RUB",
-                                "quantity": holding.quantity,
+                                "quantity": holding.raw_quantity or 0,
                                 "total_amount": (snapshot.coupon_value or 0) * holding.quantity,
                                 "provider": snapshot.provider
                             })
@@ -445,7 +445,7 @@ async def get_payment_calendar(
                                 "isin": holding.isin,
                                 "amount": snapshot.face_value or 0,
                                 "currency": snapshot.currency or "RUB",
-                                "quantity": holding.quantity,
+                                "quantity": holding.raw_quantity or 0,
                                 "total_amount": (snapshot.face_value or 0) * holding.quantity,
                                 "provider": snapshot.provider
                             })
@@ -461,7 +461,7 @@ async def get_payment_calendar(
                                 "isin": holding.isin,
                                 "amount": snapshot.dividend_value or 0,
                                 "currency": snapshot.currency or "RUB",
-                                "quantity": holding.quantity,
+                                "quantity": holding.raw_quantity or 0,
                                 "total_amount": (snapshot.dividend_value or 0) * holding.quantity,
                                 "provider": snapshot.provider
                             })
@@ -476,7 +476,7 @@ async def get_payment_calendar(
             
             # Debug: log details about each holding
             for holding in holdings:
-                logger.info(f"Holding: {holding.ticker or holding.isin} ({holding.isin}) - {holding.quantity} шт")
+                logger.info(f"Holding: {holding.ticker or holding.isin} ({holding.isin}) - {holding.raw_quantity or 0} шт")
             
             # Sort events by date
             events.sort(key=lambda x: x["date"])
