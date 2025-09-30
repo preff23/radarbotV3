@@ -170,43 +170,24 @@ def get_current_user(
 def build_portfolio_response(user_id: int, phone: Optional[str] = None, telegram_id: Optional[int] = None, username: Optional[str] = None) -> PortfolioResponse:
     summary = db_manager.get_user_portfolio_summary(user_id)
 
-    accounts_index: Dict[Optional[int], AccountResponse] = {}
-    accounts_response: List[AccountResponse] = []
+    # Создаем только один manual аккаунт
+    manual_account = AccountResponse(
+        internal_id=None,
+        account_id="manual",
+        account_name="Портфель",
+        currency="RUB",
+        portfolio_value=0.0,
+        positions=[],
+        cash=[]
+    )
 
-    for acc in summary["accounts"]:
-        account_resp = AccountResponse(
-            internal_id=acc["internal_id"],
-            account_id=acc["account_id"] or "default",
-            account_name=acc.get("account_name"),
-            currency=acc.get("currency"),
-            portfolio_value=acc.get("portfolio_value"),
-            positions=[],
-            cash=[]
-        )
-        accounts_response.append(account_resp)
-        accounts_index[acc["internal_id"]] = account_resp
-
-    # ensure default account exists for holdings without account
-    if None not in accounts_index:
-        default_account = AccountResponse(
-            internal_id=None,
-            account_id="default",
-            account_name="Портфель",
-            currency=None,
-            portfolio_value=None,
-            positions=[],
-            cash=[]
-        )
-        accounts_index[None] = default_account
-        accounts_response.append(default_account)
-
+    # Добавляем все позиции в manual аккаунт
     for holding in summary["holdings"]:
-        target_account = accounts_index.get(holding["account_internal_id"], accounts_index[None])
         name = holding.get("normalized_name") or holding.get("raw_name")
         provider_data = holding.get("provider_data") or {}
         position_resp = PortfolioPositionResponse(
             id=holding["id"],
-            account_internal_id=holding.get("account_internal_id"),
+            account_internal_id=None,  # Все позиции в manual аккаунте
             name=name,
             ticker=holding.get("ticker"),
             isin=holding.get("isin"),
@@ -219,23 +200,27 @@ def build_portfolio_response(user_id: int, phone: Optional[str] = None, telegram
             created_at=holding.get("created_at"),
             updated_at=holding.get("updated_at"),
         )
-        target_account.positions.append(position_resp)
+        manual_account.positions.append(position_resp)
 
+    # Добавляем все денежные средства в manual аккаунт
     for cash in summary["cash_positions"]:
-        target_account = accounts_index.get(cash.get("account_internal_id"), accounts_index[None])
         cash_resp = CashPositionResponse(
             id=cash["id"],
-            account_internal_id=cash.get("account_internal_id"),
+            account_internal_id=None,  # Все денежные средства в manual аккаунте
             raw_name=cash.get("raw_name"),
             amount=cash.get("amount"),
             currency=cash.get("currency"),
             created_at=cash.get("created_at"),
             updated_at=cash.get("updated_at"),
         )
-        target_account.cash.append(cash_resp)
+        manual_account.cash.append(cash_resp)
+
+    # Вычисляем общую стоимость портфеля
+    total_value = sum(acc.get("portfolio_value", 0) or 0 for acc in summary["accounts"])
+    manual_account.portfolio_value = total_value
 
     user_info = UserInfo(phone=phone, telegram_id=telegram_id, username=username)
-    return PortfolioResponse(user=user_info, accounts=accounts_response)
+    return PortfolioResponse(user=user_info, accounts=[manual_account])
 
 
 @app.get("/api/portfolio", response_model=PortfolioResponse)

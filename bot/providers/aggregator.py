@@ -336,13 +336,17 @@ class MarketDataAggregator:
     
     async def get_bond_calendar(self, secid: str) -> Optional[Dict[str, Any]]:
         try:
+            logger.info(f"Getting bond calendar for {secid}")
             cache_key_str = cache_key("bond_calendar", secid)
             cached_calendar = market_data_cache.get(cache_key_str)
             if cached_calendar:
+                logger.info(f"Found cached calendar for {secid}")
                 return cached_calendar
             
+            logger.info(f"Fetching calendar from MOEX for {secid}")
             calendar = await self.moex_bridge.bond_calendar_30d(secid)
             if calendar:
+                logger.info(f"Got calendar for {secid}: {len(calendar.coupons)} coupons, {len(calendar.amortizations)} amortizations")
                 calendar_data = {
                     "secid": secid,
                     "coupons": [

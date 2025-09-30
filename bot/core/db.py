@@ -37,6 +37,8 @@ class PortfolioAccount(Base):
     account_name = Column(String(255), nullable=True)
     portfolio_value = Column(Float, nullable=True)
     currency = Column(String(16), nullable=True)
+    daily_change_value = Column(Float, nullable=True)
+    daily_change_percent = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -233,6 +235,18 @@ class DatabaseManager:
             db.add(user)
             db.commit()
             db.refresh(user)
+            
+            # Create default "manual" account for new user
+            manual_account = PortfolioAccount(
+                user_id=user.id,
+                account_id="manual",
+                account_name="Manual",
+                portfolio_value=None,
+                currency=None
+            )
+            db.add(manual_account)
+            db.commit()
+            
             return user
         finally:
             db.close()

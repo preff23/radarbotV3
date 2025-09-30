@@ -7,6 +7,7 @@ from bot.core.db import db_manager
 from bot.analytics.portfolio_analyzer import PortfolioAnalyzer
 from bot.sources.news_rss import NewsAggregator
 from bot.utils.moex_client import MOEXClient
+from bot.providers.moex_iss.client import MOEXISSClient
 from bot.providers.aggregator import market_aggregator
 from bot.core.logging import get_logger
 
@@ -23,6 +24,7 @@ class InvestAnalyst:
         self.portfolio_analyzer = PortfolioAnalyzer()
         self.news_aggregator = NewsAggregator()
         self.moex_client = MOEXClient()
+        self.moex_iss_client = MOEXISSClient()
         self.market_aggregator = market_aggregator
     
     async def chat_with_user(self, phone_number: str, message: str) -> str:
@@ -31,7 +33,13 @@ class InvestAnalyst:
             
             market_context = await self._get_market_context()
             
-            system_prompt = self._create_system_prompt(portfolio_data, market_context)
+            # Получаем альтернативные бумаги для рекомендаций
+            holdings = portfolio_data.get("holdings", [])
+            alternatives = {}
+            if holdings and any(keyword in message.lower() for keyword in ['рекомендац', 'замен', 'лучше', 'альтернатив', 'продать', 'купить']):
+                alternatives = await self._get_alternative_securities(holdings)
+            
+            system_prompt = self._create_system_prompt(portfolio_data, market_context, alternatives)
             
             response = await self._get_chatgpt_response(system_prompt, message)
             
@@ -98,8 +106,8 @@ class InvestAnalyst:
                     "currency": acc.currency,
                     "portfolio_value": acc.portfolio_value,
                     "cash": cash_map.get(acc.id, []),
-                    "daily_change_value": acc.daily_change_value,
-                    "daily_change_percent": acc.daily_change_percent
+                    "daily_change_value": getattr(acc, 'daily_change_value', None),
+                    "daily_change_percent": getattr(acc, 'daily_change_percent', None)
                 }
                 for acc in accounts
             ]
@@ -181,7 +189,99 @@ class InvestAnalyst:
             logger.error(f"Error getting market context: {e}")
             return {"news": [], "moex_indices": {}, "currency_rates": {}}
     
-    def _create_system_prompt(self, portfolio_data: Dict[str, Any], market_context: Dict[str, Any]) -> str:
+    async def _get_alternative_securities(self, current_holdings: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Получает альтернативные ценные бумаги для рекомендаций по замене"""
+        try:
+            alternatives = {}
+            
+            for holding in current_holdings:
+                security_type = holding.get('security_type', 'bond')
+                ticker = holding.get('ticker')
+                isin = holding.get('isin')
+                
+                if not ticker and not isin:
+                    continue
+                
+                # Ищем похожие бумаги по типу
+                try:
+                    if security_type == 'bond':
+                        # Ищем облигации с похожими характеристиками
+                        search_query = f"облигация" if not ticker and not isin else (ticker or isin)
+                        similar_bonds = await self.moex_iss_client.search_securities(
+                            query=search_query,
+                            limit=5
+                        )
+                        if similar_bonds:
+                            # Конвертируем SearchResult в формат для промпта
+                            bond_data = []
+                            for bond in similar_bonds:
+                                bond_data.append({
+                                    'name': bond.name or bond.shortname,
+                                    'ticker': bond.secid,
+                                    'isin': bond.isin,
+                                    'security_type': 'bond',
+                                    'last_price': '—',
+                                    'ytm': '—'
+                                })
+                            alternatives[holding.get('name', 'Unknown')] = bond_data
+                    elif security_type == 'share':
+                        # Ищем акции из той же отрасли
+                        search_query = f"акция" if not ticker and not isin else (ticker or isin)
+                        similar_shares = await self.moex_iss_client.search_securities(
+                            query=search_query,
+                            limit=5
+                        )
+                        if similar_shares:
+                            # Конвертируем SearchResult в формат для промпта
+                            share_data = []
+                            for share in similar_shares:
+                                share_data.append({
+                                    'name': share.name or share.shortname,
+                                    'ticker': share.secid,
+                                    'isin': share.isin,
+                                    'security_type': 'share',
+                                    'last_price': '—',
+                                    'ytm': '—'
+                                })
+                            alternatives[holding.get('name', 'Unknown')] = share_data
+                except Exception as e:
+                    logger.warning(f"Failed to get alternatives for {holding.get('name')}: {e}")
+                    continue
+            
+            return alternatives
+            
+        except Exception as e:
+            logger.error(f"Error getting alternative securities: {e}")
+            return {}
+    
+    def _format_alternatives(self, alternatives: Dict[str, Any]) -> str:
+        """Форматирует альтернативные ценные бумаги для промпта"""
+        if not alternatives:
+            return ""
+        
+        alternatives_text = "АЛЬТЕРНАТИВНЫЕ ЦЕННЫЕ БУМАГИ ДЛЯ РЕКОМЕНДАЦИЙ:\n"
+        
+        for current_name, alt_securities in alternatives.items():
+            alternatives_text += f"\n📊 Вместо '{current_name}' рассмотри:\n"
+            
+            for i, security in enumerate(alt_securities[:3], 1):  # Показываем только первые 3
+                name = security.get('name', 'Неизвестно')
+                ticker = security.get('ticker', '—')
+                isin = security.get('isin', '—')
+                price = security.get('last_price', '—')
+                ytm = security.get('ytm', '—')
+                security_type = security.get('security_type', '—')
+                
+                alternatives_text += f"{i}. {name} ({ticker})\n"
+                alternatives_text += f"   ISIN: {isin}\n"
+                alternatives_text += f"   Цена: {price} ₽\n"
+                if ytm != '—':
+                    alternatives_text += f"   YTM: {ytm}%\n"
+                alternatives_text += f"   Тип: {security_type}\n\n"
+        
+        return alternatives_text
+    
+    def _create_system_prompt(self, portfolio_data: Dict[str, Any], market_context: Dict[str, Any], alternatives: Dict[str, Any] = None) -> str:
         holdings = portfolio_data.get("holdings", [])
         accounts = portfolio_data.get("accounts", [])
         detached_cash = portfolio_data.get("detached_cash", [])
@@ -315,6 +415,7 @@ class InvestAnalyst:
 Твои возможности:
 - Анализируешь портфель пользователя
 - Даешь рекомендации по инвестициям (включая конкретные покупки)
+- Даешь КОНКРЕТНЫЕ рекомендации по замене ценных бумаг в портфеле
 - Объясняешь рыночные события
 - Помогаешь с выбором ценных бумаг
 - Оцениваешь риски
@@ -322,6 +423,16 @@ class InvestAnalyst:
 - Отслеживаешь индексы MOEX
 - Подключен к Tinkoff Investments API (T-Bank) и MOEX ISS API: можешь запрашивать цены, справочные данные, календари купонов, курсы валют и т.п.
 - Используешь объединенный маркет-агрегатор (MOEX + T-Bank + CorpBonds) для доступа к котировкам и характеристикам бумаг
+
+КОНКРЕТНЫЕ РЕКОМЕНДАЦИИ ПО ЗАМЕНЕ:
+Когда пользователь спрашивает о конкретных рекомендациях по портфелю, ты можешь:
+1. Анализировать каждую позицию в портфеле
+2. Выявлять проблемные бумаги (низкая доходность, высокий риск, плохие новости)
+3. Предлагать конкретные альтернативы с обоснованием
+4. Давать четкие инструкции: "Продай X, купи Y"
+5. Объяснять почему именно эта замена лучше
+6. Учитывать размер позиции и долю в портфеле
+7. Предлагать несколько вариантов замены
 
 Текущая дата: {current_date}
 
@@ -335,6 +446,8 @@ class InvestAnalyst:
 
 {currency_summary}
 
+{self._format_alternatives(alternatives) if alternatives else ""}
+
 Правила общения:
 1. Всегда представляйся как Invest
 2. Отвечай на русском языке
@@ -345,6 +458,26 @@ class InvestAnalyst:
 7. Всегда указывай на риски инвестиций
 8. Используй новости и данные MOEX для обоснования рекомендаций
 9. Если нужно больше информации о портфеле, можешь попросить пользователя запустить анализ
+
+КОНКРЕТНЫЕ РЕКОМЕНДАЦИИ ПО ЗАМЕНЕ ЦЕННЫХ БУМАГ:
+Когда пользователь просит конкретные рекомендации по портфелю, используй следующий формат:
+
+🔍 АНАЛИЗ ПОЗИЦИЙ:
+- Проблемная бумага: [название] - [проблема: низкая доходность/высокий риск/плохие новости]
+- Рекомендация: ПРОДАТЬ
+- Альтернатива: [название] - [преимущества: выше доходность/ниже риск/лучшие перспективы]
+- Обоснование: [конкретные причины с данными]
+
+📊 ДЕТАЛИ ЗАМЕНЫ:
+- Продать: [количество] шт. [название] по [текущая цена]
+- Купить: [количество] шт. [название] по [цена]
+- Ожидаемый эффект: [улучшение доходности/снижение риска]
+
+💡 АЛЬТЕРНАТИВНЫЕ ВАРИАНТЫ:
+1. [вариант 1] - [краткое описание]
+2. [вариант 2] - [краткое описание]
+
+⚠️ РИСКИ: [указывай конкретные риски замены]
 
 Отвечай как Invest - финансовый аналитик."""
         

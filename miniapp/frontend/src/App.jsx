@@ -26,9 +26,38 @@ import {
   Progress,
   Container,
   Center,
+  Grid,
+  ThemeIcon,
+  RingProgress,
+  Skeleton,
+  Flex,
+  rem,
+  useMantineTheme,
 } from '@mantine/core'
 import { Notifications, notifications } from '@mantine/notifications'
-import { IconPlus, IconTrash, IconRefresh, IconSearch, IconEdit, IconTrendingUp, IconTrendingDown, IconMinus, IconPhone, IconLogin, IconLogout } from '@tabler/icons-react'
+import { 
+  IconPlus, 
+  IconTrash, 
+  IconRefresh, 
+  IconSearch, 
+  IconEdit, 
+  IconTrendingUp, 
+  IconTrendingDown, 
+  IconMinus, 
+  IconPhone, 
+  IconLogin, 
+  IconLogout,
+  IconWallet,
+  IconChartLine,
+  IconCoins,
+  IconDiamond,
+  IconStar,
+  IconArrowUp,
+  IconArrowDown,
+  IconEye,
+  IconSettings,
+  IconX
+} from '@tabler/icons-react'
 import './App.css'
 import { MINIAPP_REV } from './version' 
 
@@ -90,10 +119,14 @@ function getUserData() {
   return null
 }
 
-async function apiRequest(path, options = {}) {
+async function apiRequest(path, options = {}, userPhone = null) {
   const userData = getUserData()
   
-  if (!userData) {
+  // Use userPhone from state if provided, otherwise try Telegram data
+  const phone = userPhone || userData?.phone
+  const telegramId = userData?.telegram_id
+  
+  if (!phone) {
     throw new Error('User not authenticated')
   }
   
@@ -103,9 +136,11 @@ async function apiRequest(path, options = {}) {
     headers.set('Content-Type', 'application/json')
   }
   
-  // Always use real user data
-  headers.set('X-Telegram-Id', userData.telegram_id)
-  headers.set('X-User-Phone', userData.phone)
+  // Use phone from parameter or Telegram data
+  if (telegramId) {
+    headers.set('X-Telegram-Id', telegramId)
+  }
+  headers.set('X-User-Phone', phone)
   
   const tg = window?.Telegram?.WebApp
   if (tg && typeof tg.ready === 'function') { 
@@ -142,16 +177,18 @@ async function apiRequest(path, options = {}) {
   return response.json()
 }
 
-function usePortfolio() {
+function usePortfolio(userPhone = null) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const fetchData = async () => {
+    if (!userPhone) return
+    
     setLoading(true)
     setError(null)
     try {
-      const result = await apiRequest('/api/portfolio')
+      const result = await apiRequest('/api/portfolio', {}, userPhone)
       setData(result)
     } catch (err) {
       setError(err)
@@ -162,7 +199,7 @@ function usePortfolio() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [userPhone])
 
   const refresh = async () => {
     await fetchData()
@@ -186,6 +223,7 @@ function PhoneConfirmationForm({ detectedPhone, onConfirm, onReject }) {
     try {
       // Normalize phone number - remove all non-digits first
       let digitsOnly = phone.replace(/\D/g, '')
+      let normalizedPhone = ''
       
       // Handle different formats
       if (digitsOnly.length === 10) {
@@ -333,6 +371,7 @@ function LoginForm({ onLogin }) {
     try {
       // Normalize phone number - remove all non-digits first
       let digitsOnly = phone.replace(/\D/g, '')
+      let normalizedPhone = ''
       
       // Handle different formats
       if (digitsOnly.length === 10) {
@@ -439,47 +478,46 @@ function LoginForm({ onLogin }) {
 }
 
 function AccountTabs({ accounts, active, onChange }) {
-  if (!accounts || accounts.length === 0) {
-    return null
-  }
-
-  const tabs = accounts.map((acc) => ({
-    value: acc.value,
-    label: acc.label,
-  }))
-
-  return (
-    <SegmentedControl
-      fullWidth
-      value={active}
-      onChange={onChange}
-      data={tabs}
-      color="teal"
-    />
-  )
+  // Убираем табы аккаунтов - используем только один портфель
+  return null
 }
 
 function PortfolioTable({ account, onEdit, onDelete }) {
+  const theme = useMantineTheme()
+  
   if (!account) {
     return (
-      <Paper p="xl" radius="md" style={{ textAlign: 'center' }}>
-        <Stack gap="md">
-          <Avatar size="xl" color="gray" variant="light">
-            <IconMinus size={32} />
-          </Avatar>
-          <Text size="lg" fw={500} c="dimmed">Портфель пуст</Text>
-          <Text size="sm" c="dimmed">Добавьте ценные бумаги для начала работы</Text>
+      <Card 
+        p="xl" 
+        radius="xl" 
+        style={{ 
+          textAlign: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          border: 'none',
+          color: 'white'
+        }}
+      >
+        <Stack gap="lg" align="center">
+          <ThemeIcon size={80} radius="xl" variant="light" color="white" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <IconWallet size={40} />
+          </ThemeIcon>
+          <Stack gap="xs">
+            <Text size="xl" fw={700} c="white">Портфель пуст</Text>
+            <Text size="md" c="rgba(255,255,255,0.8)">
+              Добавьте ценные бумаги, чтобы начать отслеживать свой портфель
+            </Text>
+          </Stack>
         </Stack>
-      </Paper>
+      </Card>
     )
   }
 
   const getSecurityIcon = (type) => {
     switch (type?.toLowerCase()) {
-      case 'bond': return '📈'
-      case 'stock': return '📊'
-      case 'etf': return '📋'
-      default: return '💼'
+      case 'bond': return <IconChartLine size={20} />
+      case 'stock': return <IconTrendingUp size={20} />
+      case 'etf': return <IconCoins size={20} />
+      default: return <IconDiamond size={20} />
     }
   }
 
@@ -493,171 +531,176 @@ function PortfolioTable({ account, onEdit, onDelete }) {
   }
 
   return (
-    <ScrollArea style={{ height: '60vh' }}>
-      <Stack gap="sm">
+    <ScrollArea style={{ height: '65vh' }} scrollbarSize={6}>
+      <Grid gutter="md">
         {account.positions.map((position, index) => (
-          <Transition
-            key={position.id}
-            mounted={true}
-            transition="slide-right"
-            duration={300}
-            timingFunction="ease-out"
-            style={{ transitionDelay: `${index * 50}ms` }}
-          >
-            {(styles) => (
-              <Card
-                key={position.id}
-                shadow="sm"
-                padding="md"
-                radius="md"
-                withBorder
-                style={{
-                  ...styles,
-                  background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
-                  border: '1px solid #e9ecef',
-                  transition: 'all 0.2s ease',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)'
-                }}
-              >
-                <Group justify="space-between" align="flex-start">
-                  <Group gap="md" style={{ flex: 1, minWidth: 0 }}>
-                    <Avatar
-                      size="lg"
-                      color={getSecurityColor(position.security_type)}
-                      variant="light"
-                      style={{ fontSize: '20px' }}
-                    >
-                      {getSecurityIcon(position.security_type)}
-                    </Avatar>
-                    <Stack gap="xs" style={{ flex: 1, minWidth: 0 }}>
-                      <Text
-                        fw={600}
-                        size="md"
-                        style={{
-                          lineHeight: 1.2,
-                          wordBreak: 'break-word',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                        }}
-                      >
-                        {position.name}
-                      </Text>
-                      <Group gap="xs" wrap="wrap">
-                        {position.ticker && (
-                          <Badge
+          <Grid.Col key={position.id} span={12}>
+            <Transition
+              mounted={true}
+              transition="slide-up"
+              duration={300}
+              timingFunction="ease-out"
+              style={{ transitionDelay: `${index * 50}ms` }}
+            >
+              {(styles) => (
+                <Card
+                  shadow="xl"
+                  padding="lg"
+                  radius="xl"
+                  style={{
+                    ...styles,
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    cursor: 'pointer',
+                    background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+                    border: '1px solid rgba(0,0,0,0.05)',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px) scale(1.02)'
+                    e.currentTarget.style.boxShadow = '0 20px 40px rgba(0, 0, 0, 0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0) scale(1)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  {/* Декоративная полоса сверху */}
+                  <Box
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                      borderRadius: '12px 12px 0 0'
+                    }}
+                  />
+                  
+                  <Flex justify="space-between" align="flex-start" gap="md">
+                    <Stack gap="sm" style={{ flex: 1, minWidth: 0 }}>
+                      <Group gap="sm" align="center">
+                        <ThemeIcon 
+                          size="lg" 
+                          radius="xl" 
+                          variant="light" 
+                          color={getSecurityColor(position.security_type)}
+                          style={{ 
+                            background: `linear-gradient(135deg, ${theme.colors[getSecurityColor(position.security_type)][6]} 0%, ${theme.colors[getSecurityColor(position.security_type)][4]} 100%)`,
+                            color: 'white'
+                          }}
+                        >
+                          {getSecurityIcon(position.security_type)}
+                        </ThemeIcon>
+                        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                          <Text fw={700} size="lg" c="dark" truncate>
+                            {position.name}
+                          </Text>
+                          <Group gap="xs" align="center">
+                            {position.ticker && (
+                              <Badge size="sm" variant="light" color="blue" radius="md">
+                                {position.ticker}
+                              </Badge>
+                            )}
+                            {position.security_type && (
+                              <Badge size="sm" variant="light" color={getSecurityColor(position.security_type)} radius="md">
+                                {position.security_type}
+                              </Badge>
+                            )}
+                            {position.fallback && (
+                              <Badge size="sm" variant="light" color="orange" radius="md">
+                                <IconStar size={12} style={{ marginRight: 4 }} />
+                                Fallback
+                              </Badge>
+                            )}
+                          </Group>
+                        </Stack>
+                      </Group>
+                      
+                      {position.isin && (
+                        <Text size="xs" c="dimmed" style={{ fontFamily: 'monospace', opacity: 0.7 }}>
+                          {position.isin}
+                        </Text>
+                      )}
+                    </Stack>
+
+                    <Stack gap="sm" align="flex-end">
+                      <Group gap="xs" align="center">
+                        <ThemeIcon size="sm" variant="light" color="teal">
+                          <IconCoins size={16} />
+                        </ThemeIcon>
+                        <Text fw={700} size="xl" c="teal">
+                          {position.quantity || 0}
+                        </Text>
+                        <Text fw={500} size="md" c="dimmed">
+                          {position.quantity_unit || 'шт'}
+                        </Text>
+                      </Group>
+                      
+                      {position.provider && (
+                        <Badge size="xs" variant="light" color="gray" radius="md">
+                          {position.provider}
+                        </Badge>
+                      )}
+
+                      <Group gap="xs">
+                        <Tooltip label="Редактировать" position="top">
+                          <ActionIcon
                             variant="light"
                             color="blue"
-                            size="sm"
-                            style={{ fontSize: '11px' }}
+                            size="md"
+                            radius="xl"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onEdit(position)
+                            }}
+                            style={{ 
+                              background: 'rgba(102, 126, 234, 0.1)',
+                              border: '1px solid rgba(102, 126, 234, 0.2)'
+                            }}
                           >
-                            {position.ticker}
-                          </Badge>
-                        )}
-                        {position.isin && (
-                          <Tooltip label={position.isin}>
-                            <Badge
-                              variant="light"
-                              color="gray"
-                              size="sm"
-                              style={{ fontSize: '10px', maxWidth: '80px' }}
-                            >
-                              {position.isin.substring(0, 8)}...
-                            </Badge>
-                          </Tooltip>
-                        )}
-                        {position.fallback && (
-                          <Badge variant="light" color="yellow" size="sm">
-                            Справочник
-                          </Badge>
-                        )}
+                            <IconEdit size={18} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <Tooltip label="Удалить" position="top">
+                          <ActionIcon
+                            variant="light"
+                            color="red"
+                            size="md"
+                            radius="xl"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onDelete(position)
+                            }}
+                            style={{ 
+                              background: 'rgba(255, 99, 99, 0.1)',
+                              border: '1px solid rgba(255, 99, 99, 0.2)'
+                            }}
+                          >
+                            <IconTrash size={18} />
+                          </ActionIcon>
+                        </Tooltip>
                       </Group>
                     </Stack>
-                  </Group>
-                  
-                  <Stack gap="xs" align="flex-end">
-                    <Group gap="xs">
-                      <Text fw={700} size="lg" c="teal">
-                        {position.quantity ?? '—'}
-                      </Text>
-                      <Text size="sm" c="dimmed">
-                        {position.quantity_unit || 'шт'}
-                      </Text>
-                    </Group>
-                    <Group gap="xs">
-                      <Tooltip label="Редактировать">
-                        <ActionIcon
-                          variant="light"
-                          color="blue"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onEdit(position)
-                          }}
-                        >
-                          <IconEdit size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                      <Tooltip label="Удалить">
-                        <ActionIcon
-                          variant="light"
-                          color="red"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onDelete(position)
-                          }}
-                        >
-                          <IconTrash size={14} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Group>
-                  </Stack>
-                </Group>
-                
-                {position.provider && (
-                  <>
-                    <Divider my="xs" />
-                    <Group justify="space-between" align="center">
-                      <Text size="xs" c="dimmed">
-                        Источник: {position.provider}
-                      </Text>
-                      <Badge
-                        variant="light"
-                        color={getSecurityColor(position.security_type)}
-                        size="xs"
-                      >
-                        {position.security_type || 'неизвестно'}
-                      </Badge>
-                    </Group>
-                  </>
-                )}
-              </Card>
-            )}
-          </Transition>
+                  </Flex>
+                </Card>
+              )}
+            </Transition>
+          </Grid.Col>
         ))}
-      </Stack>
+      </Grid>
     </ScrollArea>
   )
 }
 
-function AddPositionModal({ opened, onClose, accounts, onSubmit }) {
+function AddPositionModal({ opened, onClose, accounts, onSubmit, userPhone }) {
   const [tab, setTab] = useState('search')
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [form, setForm] = useState({
-    account: accounts[0]?.value || 'default',
+    account: 'manual', // Всегда используем manual аккаунт
     name: '',
     ticker: '',
     isin: '',
@@ -672,7 +715,7 @@ function AddPositionModal({ opened, onClose, accounts, onSubmit }) {
       setSearchResults([])
       setSearchLoading(false)
       setForm({
-        account: accounts[0]?.value || 'default',
+        account: 'manual', // Всегда используем manual аккаунт
         name: '',
         ticker: '',
         isin: '',
@@ -683,12 +726,26 @@ function AddPositionModal({ opened, onClose, accounts, onSubmit }) {
   }, [opened, accounts])
 
   const runSearch = async () => {
-    if (!searchTerm.trim()) return
+    console.log('=== RUN SEARCH ===')
+    console.log('Search term:', searchTerm)
+    console.log('User phone:', userPhone)
+    
+    if (!searchTerm.trim()) {
+      console.log('Search term is empty, returning')
+      return
+    }
+    
     setSearchLoading(true)
     try {
-      const result = await apiRequest(`/api/portfolio/search?query=${encodeURIComponent(searchTerm.trim())}`)
+      const url = `/api/portfolio/search?query=${encodeURIComponent(searchTerm.trim())}`
+      console.log('Search URL:', url)
+      
+      const result = await apiRequest(url, {}, userPhone)
+      console.log('Search result:', result)
+      
       setSearchResults(result.results || [])
     } catch (err) {
+      console.error('Search error:', err)
       notifications.show({ message: 'Не удалось выполнить поиск', color: 'red' })
     } finally {
       setSearchLoading(false)
@@ -708,28 +765,36 @@ function AddPositionModal({ opened, onClose, accounts, onSubmit }) {
   }
 
   const handleSubmit = async () => {
+    console.log('=== ADD POSITION SUBMIT ===')
+    console.log('Form data:', form)
+    console.log('Accounts:', accounts)
+    
     const accountMeta = accounts.find((acc) => acc.value === form.account)
-    await onSubmit({
-      account_id: accountMeta?.account_id || 'default',
+    console.log('Account meta:', accountMeta)
+    
+    const payload = {
+      account_id: accountMeta?.account_id || 'manual',
       account_name: accountMeta?.label,
       name: form.name,
       ticker: form.ticker,
       isin: form.isin,
       quantity: form.quantity,
       quantity_unit: form.quantity_unit,
-    })
+    }
+    
+    console.log('Payload to send:', payload)
+    
+    try {
+      await onSubmit(payload)
     onClose()
+    } catch (error) {
+      console.error('Error submitting position:', error)
+    }
   }
 
   return (
     <Modal opened={opened} onClose={onClose} title="Добавить бумагу" size="lg" centered>
       <Stack>
-        <Select
-          label="Счёт"
-          data={accounts}
-          value={form.account}
-          onChange={(value) => setForm((prev) => ({ ...prev, account: value }))}
-        />
         <SegmentedControl
           fullWidth
           value={tab}
@@ -787,36 +852,36 @@ function AddPositionModal({ opened, onClose, accounts, onSubmit }) {
 
         {tab === 'manual' && (
           <Stack>
-            <TextInput
-              label="Название"
-              placeholder="Например, Газпром"
-              value={form.name}
-              onChange={(event) => setForm((prev) => ({ ...prev, name: event.currentTarget.value }))}
-            />
-            <TextInput
-              label="Тикер"
-              placeholder="GAZP"
-              value={form.ticker}
-              onChange={(event) => setForm((prev) => ({ ...prev, ticker: event.currentTarget.value }))}
-            />
-            <TextInput
-              label="ISIN"
-              placeholder="RU000A0JXE06"
-              value={form.isin}
-              onChange={(event) => setForm((prev) => ({ ...prev, isin: event.currentTarget.value }))}
-            />
-            <NumberInput
-              label="Количество"
-              min={0}
-              decimalScale={2}
-              value={form.quantity}
-              onChange={(value) => setForm((prev) => ({ ...prev, quantity: Number(value) }))}
-            />
-            <TextInput
-              label="Единица измерения"
-              value={form.quantity_unit}
-              onChange={(event) => setForm((prev) => ({ ...prev, quantity_unit: event.currentTarget.value }))}
-            />
+        <TextInput
+          label="Название"
+          placeholder="Например, Газпром"
+          value={form.name}
+          onChange={(event) => setForm((prev) => ({ ...prev, name: event.currentTarget.value }))}
+        />
+        <TextInput
+          label="Тикер"
+          placeholder="GAZP"
+          value={form.ticker}
+          onChange={(event) => setForm((prev) => ({ ...prev, ticker: event.currentTarget.value }))}
+        />
+        <TextInput
+          label="ISIN"
+          placeholder="RU000A0JXE06"
+          value={form.isin}
+          onChange={(event) => setForm((prev) => ({ ...prev, isin: event.currentTarget.value }))}
+        />
+        <NumberInput
+          label="Количество"
+          min={0}
+          decimalScale={2}
+          value={form.quantity}
+          onChange={(value) => setForm((prev) => ({ ...prev, quantity: Number(value) }))}
+        />
+        <TextInput
+          label="Единица измерения"
+          value={form.quantity_unit}
+          onChange={(event) => setForm((prev) => ({ ...prev, quantity_unit: event.currentTarget.value }))}
+        />
           </Stack>
         )}
 
@@ -887,6 +952,13 @@ export default function App() {
   // Check if user is authenticated
   const telegramData = getUserData()
   const isAuthenticated = userPhone || (telegramData && !showPhoneConfirmation)
+  
+  console.log('=== AUTH DEBUG ===')
+  console.log('userPhone:', userPhone)
+  console.log('telegramData:', telegramData)
+  console.log('showPhoneConfirmation:', showPhoneConfirmation)
+  console.log('isAuthenticated:', isAuthenticated)
+  console.log('==================')
 
   // Initialize Telegram WebApp
   useEffect(() => {
@@ -907,30 +979,35 @@ export default function App() {
     }
   }, [telegramData, userPhone, showPhoneConfirmation])
   
-  const { data, loading, error, refresh } = usePortfolio()
+  const { data, loading, error, refresh } = usePortfolio(userPhone)
   const accounts = useMemo(() => {
     if (!data?.accounts) return []
-    return data.accounts.map((acc) => ({
-      value: acc.internal_id === null ? 'default' : String(acc.internal_id),
-      account_id: acc.account_id,
-      label: acc.account_name || `Счёт ${acc.account_id}`,
-      raw: acc,
-    }))
+    // Всегда используем только manual аккаунт
+    const manualAccount = data.accounts.find(acc => acc.account_id === 'manual')
+    if (manualAccount) {
+      return [{
+        value: 'manual',
+        account_id: 'manual',
+        label: 'Портфель',
+        raw: manualAccount,
+      }]
+    }
+    return []
   }, [data])
 
-  const [activeAccount, setActiveAccount] = useState('default')
+  const [activeAccount, setActiveAccount] = useState('manual')
   const [addOpened, setAddOpened] = useState(false)
   const [editTarget, setEditTarget] = useState(null)
 
   useEffect(() => {
     if (accounts.length > 0 && !accounts.some((acc) => acc.value === activeAccount)) {
-      setActiveAccount(accounts[0].value)
+      setActiveAccount('manual')
     }
   }, [accounts, activeAccount])
 
   const currentAccount = useMemo(() => {
     if (accounts.length === 0) return null
-    const meta = accounts.find((acc) => acc.value === activeAccount) || accounts[0]
+    const meta = accounts.find((acc) => acc.value === 'manual') || accounts[0]
     return meta.raw
   }, [accounts, activeAccount])
 
@@ -939,7 +1016,7 @@ export default function App() {
       await apiRequest('/api/portfolio/position', {
         method: 'POST',
         body: JSON.stringify(payload),
-      })
+      }, userPhone)
       notifications.show({ message: 'Позиция добавлена', color: 'green' })
       refresh()
     } catch (err) {
@@ -949,7 +1026,7 @@ export default function App() {
 
   const handleDelete = async (position) => {
     try {
-      await apiRequest(`/api/portfolio/position/${position.id}`, { method: 'DELETE' })
+      await apiRequest(`/api/portfolio/position/${position.id}`, { method: 'DELETE' }, userPhone)
       notifications.show({ message: 'Позиция удалена', color: 'green' })
       refresh()
     } catch (err) {
@@ -962,7 +1039,7 @@ export default function App() {
       await apiRequest(`/api/portfolio/position/${position.id}`, {
         method: 'PATCH',
         body: JSON.stringify(payload),
-      })
+      }, userPhone)
       notifications.show({ message: 'Позиция обновлена', color: 'green' })
       refresh()
     } catch (err) {
@@ -972,7 +1049,7 @@ export default function App() {
 
   // Show phone confirmation form if Telegram data is available
   if (showPhoneConfirmation && detectedPhone) {
-    return (
+  return (
       <Stack style={{ minHeight: '100vh' }}>
         <AppShell
           padding="md"
@@ -1079,108 +1156,101 @@ export default function App() {
     <Stack style={{ minHeight: '100vh' }}>
       <AppShell
         padding="md"
-        header={{ height: 64 }}
-        styles={{ main: { backgroundColor: 'var(--mantine-color-body)' } }}
+        header={{ height: 80 }}
+        styles={{ 
+          main: { 
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+            minHeight: '100vh'
+          } 
+        }}
       >
         <AppShell.Header
           style={{
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             borderBottom: 'none',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            backdropFilter: 'blur(10px)',
           }}
         >
-          <Group justify="space-between" px="md" py="md">
-            <Stack gap={4}>
-              <Group gap="sm" align="center">
-                <Avatar
-                  size="md"
+          <Container size="xl" h="100%">
+            <Group justify="space-between" align="center" h="100%">
+              <Group gap="md">
+                <ThemeIcon 
+                  size="xl" 
+                  radius="xl" 
+                variant="light"
                   color="white"
-                  variant="filled"
-                  style={{
+                  style={{ 
                     background: 'rgba(255,255,255,0.2)',
-                    backdropFilter: 'blur(10px)',
+                    backdropFilter: 'blur(10px)'
                   }}
                 >
-                  📊
-                </Avatar>
-                <Stack gap={0}>
-                  <Title order={3} c="white" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+                  <IconDiamond size={24} />
+                </ThemeIcon>
+                <Stack gap={2}>
+                  <Text size="xl" fw={800} c="white" style={{ letterSpacing: '0.5px' }}>
                     Radar портфель
-                  </Title>
-                  <Text size="xs" c="rgba(255,255,255,0.8)">
+                  </Text>
+                  <Text size="xs" c="rgba(255,255,255,0.7)" style={{ letterSpacing: '0.3px' }}>
                     {data?.user ? `Аккаунт: ${data.user.phone || data.user.telegram_id || 'не определен'}` : 'Загрузка...'}
                   </Text>
                 </Stack>
               </Group>
-            </Stack>
-            <Group gap="sm">
-              <Tooltip label="Обновить данные">
-                <Button
-                  variant="white"
-                  color="dark"
-                  size="sm"
-                  leftSection={<IconRefresh size={16} />}
-                  onClick={refresh}
-                  style={{
-                    background: 'rgba(255,255,255,0.9)',
-                    backdropFilter: 'blur(10px)',
-                    border: 'none',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  Обновить
-                </Button>
-              </Tooltip>
-              <Tooltip label="Добавить ценную бумагу">
-                <Button
-                  size="sm"
-                  leftSection={<IconPlus size={16} />}
-                  onClick={() => setAddOpened(true)}
-                  style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
-                    color: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  Добавить
-                </Button>
-              </Tooltip>
-              <Tooltip label="Выйти из профиля">
-                <Button
-                  size="sm"
-                  leftSection={<IconLogout size={16} />}
+              <Group gap="sm">
+              <Button
+                variant="light"
+                  color="white"
+                  size="md"
+                  leftSection={<IconLogout size={18} />}
                   onClick={handleLogout}
+                  radius="xl"
                   style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.2)',
                     color: 'white',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    fontWeight: '600',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.25)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.15)'
+                    e.currentTarget.style.transform = 'translateY(0)'
                   }}
                 >
                   Выйти
-                </Button>
-              </Tooltip>
+              </Button>
             </Group>
           </Group>
+          </Container>
         </AppShell.Header>
         <AppShell.Main>
           <Notifications position="top-center" />
-          <Box px="md" py="lg">
+          <Container size="xl" px="md" py="lg">
             {loading && (
-              <Group justify="center">
-                <Loader color="teal" />
-              </Group>
+              <Center py="xl">
+                <Stack align="center" gap="md">
+                  <Loader size="xl" color="blue" />
+                  <Text size="lg" fw={500} c="dimmed">Загрузка портфеля...</Text>
+                </Stack>
+              </Center>
             )}
             {error && (
-              <Alert color="red" title="Ошибка">
+              <Alert 
+                color="red" 
+                title="Ошибка" 
+                icon={<IconX size={16} />}
+                radius="xl"
+                style={{ marginBottom: '1rem' }}
+              >
                 {error.message}
               </Alert>
             )}
             {!loading && !error && data && (
-              <Stack gap="md">
+              <Stack gap="xl">
                 <AccountTabs
                   accounts={accounts}
                   active={activeAccount}
@@ -1188,43 +1258,56 @@ export default function App() {
                 />
                 {currentAccount ? (
                   <Stack gap="md">
-                    <Card
-                      shadow="sm"
-                      padding="lg"
-                      radius="md"
-                      withBorder
+                    <Card 
+                      shadow="xl" 
+                      padding="xl" 
+                      radius="xl"
                       style={{
-                        background: 'linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%)',
-                        border: '1px solid #e9ecef',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        border: 'none',
+                        color: 'white'
                       }}
                     >
                       <Group justify="space-between" align="center">
                         <Group gap="md">
-                          <Avatar
-                            size="lg"
-                            color="teal"
-                            variant="light"
-                            style={{ fontSize: '24px' }}
+                          <ThemeIcon 
+                            size="xl" 
+                            radius="xl" 
+                            variant="light" 
+                            color="white"
+                            style={{ 
+                              background: 'rgba(255,255,255,0.2)',
+                              backdropFilter: 'blur(10px)'
+                            }}
                           >
-                            💼
-                          </Avatar>
-                          <Stack gap={4}>
-                            <Text fw={700} size="xl" c="dark">
-                              {currentAccount.account_name || 'Портфель'}
+                            <IconWallet size={24} />
+                          </ThemeIcon>
+                          <Stack gap="xs">
+                            <Text size="xl" fw={800} c="white">
+                              Портфель
                             </Text>
                             <Group gap="md">
                               <Badge
                                 variant="light"
-                                color="teal"
+                                color="white"
                                 size="lg"
-                                leftSection={<IconTrendingUp size={14} />}
+                                style={{ 
+                                  background: 'rgba(255,255,255,0.2)',
+                                  color: 'white',
+                                  fontSize: '12px'
+                                }}
                               >
                                 {currentAccount.currency || 'RUB'}
                               </Badge>
                               <Badge
                                 variant="light"
-                                color="blue"
+                                color="white"
                                 size="lg"
+                                style={{ 
+                                  background: 'rgba(255,255,255,0.2)',
+                                  color: 'white',
+                                  fontSize: '12px'
+                                }}
                               >
                                 {currentAccount.positions.length} бумаг
                               </Badge>
@@ -1232,9 +1315,9 @@ export default function App() {
                           </Stack>
                         </Group>
                         {currentAccount.portfolio_value && (
-                          <Stack gap={4} align="flex-end">
-                            <Text size="xs" c="dimmed">Общая стоимость</Text>
-                            <Text fw={700} size="lg" c="teal">
+                          <Stack gap="xs" align="flex-end">
+                            <Text size="sm" c="rgba(255,255,255,0.8)">Общая стоимость</Text>
+                            <Text fw={800} size="xl" c="white">
                               {currentAccount.portfolio_value.toLocaleString()} ₽
                             </Text>
                           </Stack>
@@ -1266,7 +1349,7 @@ export default function App() {
                 )}
               </Stack>
             )}
-          </Box>
+          </Container>
         </AppShell.Main>
       </AppShell>
       <AddPositionModal
@@ -1274,6 +1357,7 @@ export default function App() {
         onClose={() => setAddOpened(false)}
         accounts={accounts}
         onSubmit={handleAdd}
+        userPhone={userPhone}
       />
       <EditPositionModal
         opened={!!editTarget}

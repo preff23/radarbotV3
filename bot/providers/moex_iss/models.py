@@ -28,6 +28,7 @@ class ShareSnapshot:
     board: Optional[str] = None
     market: Optional[str] = None
     volume: Optional[float] = None
+    security_type: str = "share"
 
 
 @dataclass
@@ -48,6 +49,7 @@ class BondSnapshot:
     market: Optional[str] = None
     face_value: Optional[float] = None
     volume: Optional[float] = None
+    security_type: str = "bond"
 
 
 @dataclass

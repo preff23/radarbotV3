@@ -158,10 +158,12 @@ class PortfolioIngestPipeline:
                 normalized_name = normalize_security_name(series_fixed_name)
             
             if not normalized_name:
+                logger.warning(f"Position filtered: no normalized name for '{position.raw_name}'")
                 filtered_count += 1
                 continue
             
             if not is_security_name(normalized_name):
+                logger.warning(f"Position filtered: not a security name '{normalized_name}' (original: '{position.raw_name}')")
                 filtered_count += 1
                 continue
             
@@ -300,16 +302,26 @@ class PortfolioIngestPipeline:
                 # fallback to bond reference data if available
                 reference_entry = None
                 try:
-                    reference_entry = self._bond_reference.match(
-                        isin=position.get("isin"),
-                        ticker=position.get("ticker"),
-                        name=position.get("normalized_name") or position.get("raw_name")
-                    ) if self._bond_reference else None
+                    if self._bond_reference:
+                        # Сначала пробуем точный поиск
+                        reference_entry = self._bond_reference.match(
+                            isin=position.get("isin"),
+                            ticker=position.get("ticker"),
+                            name=position.get("normalized_name") or position.get("raw_name")
+                        )
+                        
+                        # Если не найдено, пробуем fuzzy поиск
+                        if not reference_entry:
+                            normalized_name = position.get("normalized_name") or position.get("raw_name")
+                            if normalized_name:
+                                reference_entry = self._bond_reference.match_fuzzy(normalized_name, threshold=0.75)
+                                if reference_entry:
+                                    logger.info(f"Fuzzy fallback match found for '{position.get('raw_name')}' -> '{reference_entry.name}'")
                 except Exception as ref_err:
                     logger.warning(f"Reference lookup failed for '{position.get('raw_name')}': {ref_err}")
 
                 if reference_entry:
-                    logger.info(f"Fallback reference match used for '{position.get('raw_name')}'")
+                    logger.info(f"Fallback reference match used for '{position.get('raw_name')}' -> '{reference_entry.name}'")
                     position.update({
                         "secid": reference_entry.ticker or reference_entry.isin,
                         "ticker": reference_entry.ticker or position.get("ticker"),
@@ -324,6 +336,7 @@ class PortfolioIngestPipeline:
                     return position
 
                 logger.warning(f"Could not resolve '{position.get('raw_name')}' with any query - SKIPPING")
+                logger.warning(f"Available queries were: {queries_to_try}")
                 return None
             
         except Exception as e:

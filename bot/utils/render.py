@@ -342,10 +342,20 @@ def render_calendar_30d(calendar_data: List[Dict[str, Any]]) -> str:
         return "📅 •КАЛЕНДАРЬ ВЫПЛАТ (30 ДНЕЙ)•\n\n❌ Нет предстоящих выплат в ближайшие 30 дней"
     
     current_date = datetime.now()
-    future_events = [
-        event for event in calendar_data 
-        if event.get("date") and event["date"] >= current_date
-    ]
+    logger.info(f"Rendering calendar with {len(calendar_data)} events")
+    logger.info(f"Current date: {current_date}")
+    
+    future_events = []
+    for event in calendar_data:
+        event_date = event.get("date")
+        logger.info(f"Event: {event.get('secid', 'unknown')} - date: {event_date}, type: {event.get('type', 'unknown')}")
+        if event_date and event_date >= current_date:
+            future_events.append(event)
+            logger.info(f"  -> Added to future events")
+        else:
+            logger.info(f"  -> Skipped (past date or no date)")
+    
+    logger.info(f"Found {len(future_events)} future events")
     
     if not future_events:
         return "📅 •КАЛЕНДАРЬ ВЫПЛАТ (30 ДНЕЙ)•\n\n❌ Нет предстоящих выплат в ближайшие 30 дней"

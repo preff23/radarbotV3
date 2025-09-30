@@ -103,15 +103,30 @@ class PortfolioAnalyzer:
             
             all_snapshots = integrated_bond_data + share_snapshots
             
+            logger.info(f"Created {len(all_snapshots)} snapshots: {len(integrated_bond_data)} integrated bonds, {len(share_snapshots)} shares")
+            
             bonds_with_data = {snapshot.holding_id for snapshot in integrated_bond_data if hasattr(snapshot, 'holding_id')}
             bonds_without_data = [h for h in bond_holdings if h.id not in bonds_with_data]
+            
+            logger.info(f"Bonds with data: {len(bonds_with_data)}, bonds without data: {len(bonds_without_data)}")
             
             if bonds_without_data:
                 basic_bond_snapshots = await self._create_basic_snapshots(bonds_without_data)
                 all_snapshots.extend(basic_bond_snapshots)
+                logger.info(f"Added {len(basic_bond_snapshots)} basic bond snapshots")
             
             if not all_snapshots:
                 all_snapshots = await self._create_basic_snapshots(holdings)
+                logger.info(f"Created {len(all_snapshots)} basic snapshots from all holdings")
+            
+            logger.info(f"Total snapshots before calendar: {len(all_snapshots)}")
+            
+            # Отладочная информация о типах снапшотов
+            for i, snapshot in enumerate(all_snapshots):
+                logger.info(f"Snapshot {i}: {getattr(snapshot, 'name', 'unknown')} - security_type: {getattr(snapshot, 'security_type', 'None')}")
+            
+            bond_snapshots = [s for s in all_snapshots if getattr(s, 'security_type', None) == "bond"]
+            logger.info(f"Bond snapshots for calendar: {len(bond_snapshots)}")
             
             bond_calendar = await self._get_bond_calendar(all_snapshots)
             
@@ -327,7 +342,7 @@ class PortfolioAnalyzer:
                                 'duration': bond_data.duration,
                                 'face_value': bond_data.face_value,
                                 'sector': bond_data.sector,
-                                'security_type': bond_data.security_type,
+                                'security_type': bond_data.security_type or 'bond',  # Устанавливаем 'bond' по умолчанию
                                 'confidence': bond_data.confidence,
                                 'corpbonds_found': bond_data.corpbonds_found,
                                 'tbank_found': bond_data.tbank_found,
@@ -358,14 +373,19 @@ class PortfolioAnalyzer:
                 if snapshot.security_type == "bond" and snapshot.secid
             ]
             
+            logger.info(f"Getting bond calendar for {len(bond_secids)} bonds: {bond_secids}")
+            
             if not bond_secids:
+                logger.info("No bond secids found, returning empty calendar")
                 return []
             
             calendar_tasks = [
                 self.market_aggregator.get_bond_calendar(secid)
                 for secid in bond_secids
             ]
+            logger.info(f"Created {len(calendar_tasks)} calendar tasks")
             calendar_results = await asyncio.gather(*calendar_tasks, return_exceptions=True)
+            logger.info(f"Got {len(calendar_results)} calendar results")
             
             all_events = []
             for i, result in enumerate(calendar_results):
@@ -378,20 +398,27 @@ class PortfolioAnalyzer:
                     bond_snapshot = next(
                         (s for s in snapshots if s.secid == bond_secid), None
                     )
-                    bond_name = bond_snapshot.name if bond_snapshot else bond_secid
+                    bond_name = getattr(bond_snapshot, 'name', None) or getattr(bond_snapshot, 'shortname', None) or bond_secid
+                    
+                    logger.info(f"Processing calendar for {bond_secid}: {len(result.get('coupons', []))} coupons, {len(result.get('amortizations', []))} amortizations")
                     
                     for coupon in result.get("coupons", []):
                         event = coupon.copy()
                         event["secid"] = bond_secid
                         event["name"] = bond_name
+                        logger.info(f"  Coupon: {event.get('date')} - {event.get('value')} ₽")
                         all_events.append(event)
                     
                     for amort in result.get("amortizations", []):
                         event = amort.copy()
                         event["secid"] = bond_secid
                         event["name"] = bond_name
+                        logger.info(f"  Amortization: {event.get('date')} - {event.get('value')} ₽")
                         all_events.append(event)
+                else:
+                    logger.info(f"No calendar data for {bond_secids[i]}")
             
+            logger.info(f"Total calendar events collected: {len(all_events)}")
             return all_events
             
         except Exception as e:
@@ -631,6 +658,36 @@ class PortfolioAnalyzer:
             weighted_positions = [p for p in weighted_positions if p.get("notional_estimate")]
             weighted_positions.sort(key=lambda x: x["notional_estimate"], reverse=True)
             portfolio_data["top_positions"] = weighted_positions[:5]
+            
+            # Добавляем топ-3 стабильных и топ-3 рискованных ценных бумаг
+            stable_positions = []
+            risky_positions = []
+            
+            for position in weighted_positions:
+                if position.get("type") == "bond":
+                    # Для облигаций: стабильные = высокий YTM + низкая волатильность
+                    ytm = position.get("ytm", 0) or 0
+                    change_pct = abs(position.get("change_pct", 0) or 0)
+                    
+                    if ytm > 15 and change_pct < 2:  # Высокий доход, низкая волатильность
+                        stable_positions.append(position)
+                    elif ytm < 10 or change_pct > 5:  # Низкий доход или высокая волатильность
+                        risky_positions.append(position)
+                elif position.get("type") == "share":
+                    # Для акций: стабильные = низкая волатильность, рискованные = высокая волатильность
+                    change_pct = abs(position.get("change_pct", 0) or 0)
+                    
+                    if change_pct < 3:  # Низкая волатильность
+                        stable_positions.append(position)
+                    elif change_pct > 8:  # Высокая волатильность
+                        risky_positions.append(position)
+            
+            # Сортируем и берем топ-3
+            stable_positions.sort(key=lambda x: x.get("notional_estimate", 0), reverse=True)
+            risky_positions.sort(key=lambda x: x.get("notional_estimate", 0), reverse=True)
+            
+            portfolio_data["top_stable"] = stable_positions[:3]
+            portfolio_data["top_risky"] = risky_positions[:3]
  
             meta_block = ""
             if ocr_meta:

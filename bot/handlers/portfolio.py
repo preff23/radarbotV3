@@ -208,7 +208,7 @@ class PortfolioHandler:
                 await query.edit_message_text("Пользователь не найден")
                 return
 
-            cleared_count = self.db_manager.delete_user_holdings(user.id)
+            cleared_count = self.db_manager.clear_user_holdings(user.id)
             try:
                 self.db_manager.clear_portfolio_meta(user.id)
             except Exception:
