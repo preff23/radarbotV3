@@ -308,6 +308,9 @@ async def get_security_details(
         
         snapshot = snapshots[0]  # Get the first (most relevant) snapshot
         
+        # Log the snapshot data for debugging
+        logger.info(f"Security details for {isin}: duration={snapshot.duration}, face_value={snapshot.face_value}, provider={snapshot.provider}")
+        
         # Build detailed response
         details = {
             "isin": snapshot.isin,
