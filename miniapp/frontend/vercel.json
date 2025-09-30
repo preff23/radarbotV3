@@ -1,6 +1,13 @@
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://130.193.52.12:8000/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "https://130.193.52.12:8000/api/$1"
+    }
   ]
 }
