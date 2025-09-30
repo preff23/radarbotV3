@@ -293,6 +293,88 @@ async def search_securities(
     return SearchResponse(results=results)
 
 
+@app.get("/api/portfolio/security/{isin}/details")
+async def get_security_details(
+    isin: str,
+    user: UserContext = Depends(get_current_user)
+):
+    """Get detailed information about a security by ISIN."""
+    try:
+        # Get market data for the security
+        snapshots = await market_aggregator.get_snapshot_for(isin)
+        
+        if not snapshots:
+            raise HTTPException(status_code=404, detail="Security not found")
+        
+        snapshot = snapshots[0]  # Get the first (most relevant) snapshot
+        
+        # Build detailed response
+        details = {
+            "isin": snapshot.isin,
+            "ticker": snapshot.ticker,
+            "name": snapshot.name,
+            "shortname": snapshot.shortname,
+            "security_type": snapshot.security_type,
+            "provider": snapshot.provider,
+            
+            # Price information
+            "price": {
+                "last": snapshot.last_price,
+                "change_day_pct": snapshot.change_day_pct,
+                "currency": snapshot.currency,
+                "trading_status": snapshot.trading_status
+            },
+            
+            # Bond-specific information
+            "bond_info": {
+                "ytm": snapshot.ytm,
+                "duration": snapshot.duration,
+                "aci": snapshot.aci,
+                "face_value": snapshot.face_value,
+                "coupon_value": snapshot.coupon_value,
+                "coupon_rate": snapshot.coupon_rate,
+                "coupon_frequency": snapshot.coupon_frequency,
+                "next_coupon_date": snapshot.next_coupon_date.isoformat() if snapshot.next_coupon_date else None,
+                "maturity_date": snapshot.maturity_date.isoformat() if snapshot.maturity_date else None,
+                "issue_date": snapshot.issue_date.isoformat() if snapshot.issue_date else None,
+                "issue_size": snapshot.issue_size
+            } if snapshot.security_type == "bond" else None,
+            
+            # Share-specific information
+            "share_info": {
+                "sector": snapshot.sector,
+                "next_dividend_date": snapshot.next_dividend_date.isoformat() if snapshot.next_dividend_date else None,
+                "dividend_value": snapshot.dividend_value
+            } if snapshot.security_type == "share" else None,
+            
+            # Rating information
+            "rating": {
+                "rating": snapshot.rating,
+                "rating_agency": snapshot.rating_agency
+            } if snapshot.rating else None,
+            
+            # Trading information
+            "trading": {
+                "volume": snapshot.volume,
+                "board": snapshot.board,
+                "is_trading_open": snapshot.is_trading_open,
+                "data_freshness": snapshot.data_freshness
+            },
+            
+            # Metadata
+            "metadata": {
+                "cached_at": snapshot.cached_at.isoformat() if snapshot.cached_at else None,
+                "last_update": snapshot.last_update.isoformat() if snapshot.last_update else None
+            }
+        }
+        
+        return details
+        
+    except Exception as exc:
+        logger.error(f"Failed to get security details for {isin}: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.patch("/api/portfolio/position/{position_id}", response_model=PortfolioResponse)
 def update_position(
     position_id: int,
