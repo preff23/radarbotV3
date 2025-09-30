@@ -383,17 +383,24 @@ async def get_security_details(
 
 @app.get("/api/portfolio/calendar")
 async def get_payment_calendar(
-    month: int = None,
-    year: int = None,
+    period: str = "30",  # "30", "90", "all"
     user: UserContext = Depends(get_current_user)
 ):
     """Get payment calendar for user's portfolio."""
     try:
-        # Default to current month/year if not provided
-        from datetime import datetime
+        from datetime import datetime, timedelta
         now = datetime.now()
-        month = month or now.month
-        year = year or now.year
+        
+        # Calculate date range based on period
+        if period == "30":
+            start_date = now
+            end_date = now + timedelta(days=30)
+        elif period == "90":
+            start_date = now
+            end_date = now + timedelta(days=90)
+        else:  # "all"
+            start_date = now
+            end_date = now + timedelta(days=365)  # Look ahead 1 year
         
         # Get user's portfolio
         session: Session = db_manager.SessionLocal()
@@ -518,7 +525,7 @@ async def get_payment_calendar(
                     # For bonds - get coupon and maturity dates
                     if snapshot and snapshot.security_type == "bond":
                         # Add coupon events
-                        if snapshot.next_coupon_date:
+                        if snapshot.next_coupon_date and start_date <= snapshot.next_coupon_date <= end_date:
                             events.append({
                                 "date": snapshot.next_coupon_date.isoformat(),
                                 "type": "coupon",
@@ -533,7 +540,7 @@ async def get_payment_calendar(
                             })
                         
                         # Add maturity events
-                        if snapshot.maturity_date:
+                        if snapshot.maturity_date and start_date <= snapshot.maturity_date <= end_date:
                             events.append({
                                 "date": snapshot.maturity_date.isoformat(),
                                 "type": "maturity",
@@ -549,7 +556,7 @@ async def get_payment_calendar(
                     
                     # For shares - get dividend events
                     elif snapshot and snapshot.security_type == "share":
-                        if snapshot.next_dividend_date:
+                        if snapshot.next_dividend_date and start_date <= snapshot.next_dividend_date <= end_date:
                             events.append({
                                 "date": snapshot.next_dividend_date.isoformat(),
                                 "type": "dividend",
@@ -568,7 +575,7 @@ async def get_payment_calendar(
                     continue
             
             # Log debug information
-            logger.info(f"Calendar request: month={month}, year={year}, holdings_count={len(holdings)}")
+            logger.info(f"Calendar request: period={period}, start_date={start_date}, end_date={end_date}, holdings_count={len(holdings)}")
             
             # Debug: log details about each holding
             for holding in holdings:
@@ -594,8 +601,9 @@ async def get_payment_calendar(
             
             return {
                 "events": events,
-                "month": month,
-                "year": year,
+                "period": period,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
                 "total_events": len(events)
             }
             
