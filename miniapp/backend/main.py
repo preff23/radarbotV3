@@ -400,7 +400,9 @@ async def get_payment_calendar(
             end_date = now + timedelta(days=90)
         else:  # "all"
             start_date = now
-            end_date = now + timedelta(days=365)  # Look ahead 1 year
+            end_date = now + timedelta(days=3650)  # 10 years
+        
+        logger.info(f"Calendar request: period={period}, start_date={start_date.isoformat()}, end_date={end_date.isoformat()}")
         
         # Get user's portfolio
         session: Session = db_manager.SessionLocal()
@@ -436,11 +438,13 @@ async def get_payment_calendar(
                                     from datetime import datetime, timedelta
                                     now = datetime.now()
                                     
+                                    logger.info(f"Requesting T-Bank coupons for {holding.isin} (FIGI: {snapshot.figi}) from {start_date.isoformat()} to {end_date.isoformat()}")
                                     coupons = await tbank_client.get_bond_coupons(
                                         snapshot.figi, 
                                         from_date=start_date, 
                                         to_date=end_date
                                     )
+                                    logger.info(f"T-Bank returned {len(coupons)} coupons for {holding.isin}")
                                     
                                     if coupons:
                                         # Add all coupons in range as events
@@ -471,12 +475,14 @@ async def get_payment_calendar(
                                     moex_results = await moex_client.search_securities(holding.isin)
                                     if moex_results:
                                         moex_secid = moex_results[0].secid
+                                        logger.info(f"Requesting MOEX calendar for {holding.isin} (SECID: {moex_secid})")
                                         calendar_data = await moex_client.get_bond_calendar(moex_secid)
                                         if calendar_data:
                                             if calendar_data.coupons:
                                                 # Filter coupons by date range
                                                 from datetime import datetime
                                                 future_coupons = [c for c in calendar_data.coupons if start_date <= c.coupon_date <= end_date]
+                                                logger.info(f"MOEX calendar for {holding.isin}: {len(calendar_data.coupons)} total coupons, {len(future_coupons)} in date range")
                                                 
                                                 if future_coupons:
                                                     # Add all coupons in range as events
@@ -525,11 +531,13 @@ async def get_payment_calendar(
                                     from datetime import datetime, timedelta
                                     now = datetime.now()
                                     
+                                    logger.info(f"Requesting T-Bank dividends for {holding.isin} (FIGI: {snapshot.figi}) from {start_date.isoformat()} to {end_date.isoformat()}")
                                     dividends = await tbank_client.get_dividends(
                                         snapshot.figi,
                                         from_date=start_date,
                                         to_date=end_date
                                     )
+                                    logger.info(f"T-Bank returned {len(dividends)} dividends for {holding.isin}")
                                     
                                     if dividends:
                                         # Add all dividends in range as events
@@ -577,7 +585,9 @@ async def get_payment_calendar(
                 except Exception as e:
                     logger.error(f"  Error getting snapshot for {holding.isin}: {e}")
             
-            logger.info(f"Found {len(events)} events for user {user.id}")
+            logger.info(f"Found {len(events)} events for user {user.id} in period {period}")
+            for event in events[:10]:  # Log first 10 events
+                logger.info(f"Event: {event['date']} - {event['type']} - {event['security_name']} - {event['amount']} {event['currency']} (provider: {event.get('provider', 'unknown')})")
             
             # Sort events by date
             events.sort(key=lambda x: x["date"])
