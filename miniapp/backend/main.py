@@ -420,13 +420,13 @@ async def get_payment_calendar(
                     
                     # For bonds - get coupon and maturity dates
                     if snapshot.security_type == "bond":
-                        # Add coupon events (simplified - using mock data for now)
+                        # Add coupon events
                         if snapshot.next_coupon_date:
                             events.append({
                                 "date": snapshot.next_coupon_date.isoformat(),
                                 "type": "coupon",
-                                "security_name": holding.name,
-                                "ticker": holding.ticker,
+                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.coupon_value or 0,
                                 "currency": snapshot.currency or "RUB",
@@ -440,8 +440,8 @@ async def get_payment_calendar(
                             events.append({
                                 "date": snapshot.maturity_date.isoformat(),
                                 "type": "maturity",
-                                "security_name": holding.name,
-                                "ticker": holding.ticker,
+                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.face_value or 0,
                                 "currency": snapshot.currency or "RUB",
@@ -450,14 +450,14 @@ async def get_payment_calendar(
                                 "provider": snapshot.provider
                             })
                     
-                    # For shares - get dividend events (simplified)
+                    # For shares - get dividend events
                     elif snapshot.security_type == "share":
                         if snapshot.next_dividend_date:
                             events.append({
                                 "date": snapshot.next_dividend_date.isoformat(),
                                 "type": "dividend",
-                                "security_name": holding.name,
-                                "ticker": holding.ticker,
+                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.dividend_value or 0,
                                 "currency": snapshot.currency or "RUB",
