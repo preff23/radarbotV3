@@ -410,16 +410,51 @@ async def get_payment_calendar(
             
             # Process each holding to get payment events
             for holding in holdings:
-                # Get detailed security information
+                # Get detailed security information - force MOEX for bonds to get calendar data
                 try:
-                    snapshots = await market_aggregator.get_snapshot_for(holding.isin)
-                    if not snapshots:
-                        continue
-                        
-                    snapshot = snapshots[0]
+                    if holding.security_type == "bond":
+                        # For bonds, try MOEX first to get calendar data
+                        from bot.providers.moex_iss.client import MOEXISSClient
+                        async with MOEXISSClient() as moex_client:
+                            moex_results = await moex_client.search_securities(holding.isin)
+                            if moex_results:
+                                moex_secid = moex_results[0].secid
+                                snapshot = await moex_client.get_bond_marketdata(moex_secid)
+                                if snapshot:
+                                    # Get calendar data
+                                    calendar_data = await moex_client.get_bond_calendar(moex_secid)
+                                    if calendar_data:
+                                        # Extract next coupon date and value
+                                        from datetime import datetime
+                                        next_coupon_date = None
+                                        coupon_value = None
+                                        if calendar_data.coupons:
+                                            now = datetime.now()
+                                            future_coupons = [c for c in calendar_data.coupons if c.coupon_date >= now]
+                                            if future_coupons:
+                                                next_coupon = min(future_coupons, key=lambda x: x.coupon_date)
+                                                next_coupon_date = next_coupon.coupon_date
+                                                coupon_value = next_coupon.coupon_value
+                                        
+                                        # Extract maturity date
+                                        maturity_date = None
+                                        if calendar_data.amortizations:
+                                            last_amort = max(calendar_data.amortizations, key=lambda x: x.amort_date)
+                                            maturity_date = last_amort.amort_date
+                                        
+                                        # Update snapshot with calendar data
+                                        snapshot.next_coupon_date = next_coupon_date
+                                        snapshot.maturity_date = maturity_date
+                                        snapshot.coupon_value = coupon_value
+                    else:
+                        # For other securities, use regular aggregator
+                        snapshots = await market_aggregator.get_snapshot_for(holding.isin)
+                        if not snapshots:
+                            continue
+                        snapshot = snapshots[0]
                     
                     # For bonds - get coupon and maturity dates
-                    if snapshot.security_type == "bond":
+                    if snapshot and snapshot.security_type == "bond":
                         # Add coupon events
                         if snapshot.next_coupon_date:
                             events.append({
@@ -431,7 +466,7 @@ async def get_payment_calendar(
                                 "amount": snapshot.coupon_value or 0,
                                 "currency": snapshot.currency or "RUB",
                                 "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.coupon_value or 0) * holding.quantity,
+                                "total_amount": (snapshot.coupon_value or 0) * (holding.raw_quantity or 0),
                                 "provider": snapshot.provider
                             })
                         
@@ -446,12 +481,12 @@ async def get_payment_calendar(
                                 "amount": snapshot.face_value or 0,
                                 "currency": snapshot.currency or "RUB",
                                 "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.face_value or 0) * holding.quantity,
+                                "total_amount": (snapshot.face_value or 0) * (holding.raw_quantity or 0),
                                 "provider": snapshot.provider
                             })
                     
                     # For shares - get dividend events
-                    elif snapshot.security_type == "share":
+                    elif snapshot and snapshot.security_type == "share":
                         if snapshot.next_dividend_date:
                             events.append({
                                 "date": snapshot.next_dividend_date.isoformat(),
@@ -462,7 +497,7 @@ async def get_payment_calendar(
                                 "amount": snapshot.dividend_value or 0,
                                 "currency": snapshot.currency or "RUB",
                                 "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.dividend_value or 0) * holding.quantity,
+                                "total_amount": (snapshot.dividend_value or 0) * (holding.raw_quantity or 0),
                                 "provider": snapshot.provider
                             })
                 
