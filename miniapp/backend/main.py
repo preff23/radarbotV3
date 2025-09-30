@@ -435,25 +435,30 @@ async def get_payment_calendar(
                                     # Get future coupons
                                     from datetime import datetime, timedelta
                                     now = datetime.now()
-                                    future_date = now + timedelta(days=365)  # Look ahead 1 year
                                     
                                     coupons = await tbank_client.get_bond_coupons(
                                         snapshot.figi, 
-                                        from_date=now, 
-                                        to_date=future_date
+                                        from_date=start_date, 
+                                        to_date=end_date
                                     )
                                     
                                     if coupons:
-                                        # Find next coupon
-                                        next_coupon = min(coupons, key=lambda x: x.coupon_date)
-                                        snapshot.next_coupon_date = next_coupon.coupon_date
-                                        snapshot.coupon_value = next_coupon.coupon_value
+                                        # Add all coupons in range as events
+                                        for coupon in coupons:
+                                            events.append({
+                                                "date": coupon.coupon_date.isoformat(),
+                                                "type": "coupon",
+                                                "security_name": snapshot.name or snapshot.shortname or holding.ticker or holding.isin,
+                                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
+                                                "isin": holding.isin,
+                                                "amount": coupon.coupon_value or 0,
+                                                "currency": snapshot.currency or "RUB",
+                                                "quantity": holding.raw_quantity or 0,
+                                                "total_amount": (coupon.coupon_value or 0) * (holding.raw_quantity or 0),
+                                                "provider": "T-Bank"
+                                            })
                                         
-                                        # Find maturity (last coupon)
-                                        last_coupon = max(coupons, key=lambda x: x.coupon_date)
-                                        snapshot.maturity_date = last_coupon.coupon_date
-                                        
-                                        logger.info(f"Found T-Bank calendar data for {holding.isin}: next_coupon={snapshot.next_coupon_date}, maturity={snapshot.maturity_date}")
+                                        logger.info(f"Found T-Bank calendar data for {holding.isin}: {len(coupons)} coupons")
                                     
                                 except Exception as e:
                                     logger.error(f"Failed to get T-Bank coupons for {holding.isin}: {e}")
@@ -468,30 +473,45 @@ async def get_payment_calendar(
                                         moex_secid = moex_results[0].secid
                                         calendar_data = await moex_client.get_bond_calendar(moex_secid)
                                         if calendar_data:
-                                            # Extract next coupon date and value
-                                            from datetime import datetime
-                                            next_coupon_date = None
-                                            coupon_value = None
                                             if calendar_data.coupons:
-                                                now = datetime.now()
-                                                future_coupons = [c for c in calendar_data.coupons if c.coupon_date >= now]
+                                                # Filter coupons by date range
+                                                from datetime import datetime
+                                                future_coupons = [c for c in calendar_data.coupons if start_date <= c.coupon_date <= end_date]
+                                                
                                                 if future_coupons:
-                                                    next_coupon = min(future_coupons, key=lambda x: x.coupon_date)
-                                                    next_coupon_date = next_coupon.coupon_date
-                                                    coupon_value = next_coupon.coupon_value
+                                                    # Add all coupons in range as events
+                                                    for coupon in future_coupons:
+                                                        events.append({
+                                                            "date": coupon.coupon_date.isoformat(),
+                                                            "type": "coupon",
+                                                            "security_name": snapshot.name or snapshot.shortname or holding.ticker or holding.isin,
+                                                            "ticker": holding.ticker or snapshot.ticker or holding.isin,
+                                                            "isin": holding.isin,
+                                                            "amount": coupon.coupon_value or 0,
+                                                            "currency": snapshot.currency or "RUB",
+                                                            "quantity": holding.raw_quantity or 0,
+                                                            "total_amount": (coupon.coupon_value or 0) * (holding.raw_quantity or 0),
+                                                            "provider": "MOEX"
+                                                        })
                                             
-                                            # Extract maturity date
-                                            maturity_date = None
+                                            # Add amortizations in range
                                             if calendar_data.amortizations:
-                                                last_amort = max(calendar_data.amortizations, key=lambda x: x.amort_date)
-                                                maturity_date = last_amort.amort_date
+                                                future_amorts = [a for a in calendar_data.amortizations if start_date <= a.amort_date <= end_date]
+                                                for amort in future_amorts:
+                                                    events.append({
+                                                        "date": amort.amort_date.isoformat(),
+                                                        "type": "maturity",
+                                                        "security_name": snapshot.name or snapshot.shortname or holding.ticker or holding.isin,
+                                                        "ticker": holding.ticker or snapshot.ticker or holding.isin,
+                                                        "isin": holding.isin,
+                                                        "amount": amort.amort_value or 0,
+                                                        "currency": snapshot.currency or "RUB",
+                                                        "quantity": holding.raw_quantity or 0,
+                                                        "total_amount": (amort.amort_value or 0) * (holding.raw_quantity or 0),
+                                                        "provider": "MOEX"
+                                                    })
                                             
-                                            # Update snapshot with calendar data
-                                            snapshot.next_coupon_date = next_coupon_date
-                                            snapshot.maturity_date = maturity_date
-                                            snapshot.coupon_value = coupon_value
-                                            
-                                            logger.info(f"Found MOEX calendar data for {holding.isin}: next_coupon={next_coupon_date}, maturity={maturity_date}")
+                                            logger.info(f"Found MOEX calendar data for {holding.isin}: {len(future_coupons) if 'future_coupons' in locals() else 0} coupons, {len(future_amorts) if 'future_amorts' in locals() else 0} amortizations")
                                 
                                 except Exception as e:
                                     logger.error(f"Failed to get MOEX calendar for {holding.isin}: {e}")
@@ -504,71 +524,34 @@ async def get_payment_calendar(
                                 try:
                                     from datetime import datetime, timedelta
                                     now = datetime.now()
-                                    future_date = now + timedelta(days=365)
                                     
                                     dividends = await tbank_client.get_dividends(
                                         snapshot.figi,
-                                        from_date=now,
-                                        to_date=future_date
+                                        from_date=start_date,
+                                        to_date=end_date
                                     )
                                     
                                     if dividends:
-                                        next_dividend = min(dividends, key=lambda x: x.payment_date)
-                                        snapshot.next_dividend_date = next_dividend.payment_date
-                                        snapshot.dividend_value = next_dividend.dividend_net
+                                        # Add all dividends in range as events
+                                        for dividend in dividends:
+                                            events.append({
+                                                "date": dividend.payment_date.isoformat(),
+                                                "type": "dividend",
+                                                "security_name": snapshot.name or snapshot.shortname or holding.ticker or holding.isin,
+                                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
+                                                "isin": holding.isin,
+                                                "amount": dividend.dividend_net or 0,
+                                                "currency": snapshot.currency or "RUB",
+                                                "quantity": holding.raw_quantity or 0,
+                                                "total_amount": (dividend.dividend_net or 0) * (holding.raw_quantity or 0),
+                                                "provider": "T-Bank"
+                                            })
                                         
-                                        logger.info(f"Found T-Bank dividend data for {holding.isin}: next_dividend={snapshot.next_dividend_date}")
+                                        logger.info(f"Found T-Bank dividend data for {holding.isin}: {len(dividends)} dividends")
                                 
                                 except Exception as e:
                                     logger.error(f"Failed to get T-Bank dividends for {holding.isin}: {e}")
                     
-                    # For bonds - get coupon and maturity dates
-                    if snapshot and snapshot.security_type == "bond":
-                        # Add coupon events
-                        if snapshot.next_coupon_date and start_date <= snapshot.next_coupon_date <= end_date:
-                            events.append({
-                                "date": snapshot.next_coupon_date.isoformat(),
-                                "type": "coupon",
-                                "security_name": snapshot.name or snapshot.shortname or holding.raw_name or holding.ticker or holding.isin,
-                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
-                                "isin": holding.isin,
-                                "amount": snapshot.coupon_value or 0,
-                                "currency": snapshot.currency or "RUB",
-                                "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.coupon_value or 0) * (holding.raw_quantity or 0),
-                                "provider": snapshot.provider
-                            })
-                        
-                        # Add maturity events
-                        if snapshot.maturity_date and start_date <= snapshot.maturity_date <= end_date:
-                            events.append({
-                                "date": snapshot.maturity_date.isoformat(),
-                                "type": "maturity",
-                                "security_name": snapshot.name or snapshot.shortname or holding.raw_name or holding.ticker or holding.isin,
-                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
-                                "isin": holding.isin,
-                                "amount": snapshot.face_value or 0,
-                                "currency": snapshot.currency or "RUB",
-                                "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.face_value or 0) * (holding.raw_quantity or 0),
-                                "provider": snapshot.provider
-                            })
-                    
-                    # For shares - get dividend events
-                    elif snapshot and snapshot.security_type == "share":
-                        if snapshot.next_dividend_date and start_date <= snapshot.next_dividend_date <= end_date:
-                            events.append({
-                                "date": snapshot.next_dividend_date.isoformat(),
-                                "type": "dividend",
-                                "security_name": snapshot.name or snapshot.shortname or holding.raw_name or holding.ticker or holding.isin,
-                                "ticker": holding.ticker or snapshot.ticker or holding.isin,
-                                "isin": holding.isin,
-                                "amount": snapshot.dividend_value or 0,
-                                "currency": snapshot.currency or "RUB",
-                                "quantity": holding.raw_quantity or 0,
-                                "total_amount": (snapshot.dividend_value or 0) * (holding.raw_quantity or 0),
-                                "provider": snapshot.provider
-                            })
                 
                 except Exception as e:
                     logger.error(f"Failed to process holding {holding.isin}: {e}")
