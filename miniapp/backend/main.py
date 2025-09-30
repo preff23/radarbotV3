@@ -381,6 +381,113 @@ async def get_security_details(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@app.get("/api/portfolio/calendar")
+async def get_payment_calendar(
+    month: int = None,
+    year: int = None,
+    user: UserContext = Depends(get_current_user)
+):
+    """Get payment calendar for user's portfolio."""
+    try:
+        # Default to current month/year if not provided
+        from datetime import datetime
+        now = datetime.now()
+        month = month or now.month
+        year = year or now.year
+        
+        # Get user's portfolio
+        session: Session = db_manager.SessionLocal()
+        try:
+            holdings = session.query(PortfolioHoldingV2).filter(
+                PortfolioHoldingV2.user_id == user.id,
+                PortfolioHoldingV2.is_active == True
+            ).all()
+            
+            if not holdings:
+                return {"events": [], "month": month, "year": year}
+            
+            events = []
+            
+            # Process each holding to get payment events
+            for holding in holdings:
+                # Get detailed security information
+                try:
+                    snapshots = await market_aggregator.get_snapshot_for(holding.isin)
+                    if not snapshots:
+                        continue
+                        
+                    snapshot = snapshots[0]
+                    
+                    # For bonds - get coupon and maturity dates
+                    if snapshot.security_type == "bond":
+                        # Add coupon events (simplified - using mock data for now)
+                        if snapshot.next_coupon_date:
+                            events.append({
+                                "date": snapshot.next_coupon_date.isoformat(),
+                                "type": "coupon",
+                                "security_name": holding.name,
+                                "ticker": holding.ticker,
+                                "isin": holding.isin,
+                                "amount": snapshot.coupon_value or 0,
+                                "currency": snapshot.currency or "RUB",
+                                "quantity": holding.quantity,
+                                "total_amount": (snapshot.coupon_value or 0) * holding.quantity,
+                                "provider": snapshot.provider
+                            })
+                        
+                        # Add maturity events
+                        if snapshot.maturity_date:
+                            events.append({
+                                "date": snapshot.maturity_date.isoformat(),
+                                "type": "maturity",
+                                "security_name": holding.name,
+                                "ticker": holding.ticker,
+                                "isin": holding.isin,
+                                "amount": snapshot.face_value or 0,
+                                "currency": snapshot.currency or "RUB",
+                                "quantity": holding.quantity,
+                                "total_amount": (snapshot.face_value or 0) * holding.quantity,
+                                "provider": snapshot.provider
+                            })
+                    
+                    # For shares - get dividend events (simplified)
+                    elif snapshot.security_type == "share":
+                        if snapshot.next_dividend_date:
+                            events.append({
+                                "date": snapshot.next_dividend_date.isoformat(),
+                                "type": "dividend",
+                                "security_name": holding.name,
+                                "ticker": holding.ticker,
+                                "isin": holding.isin,
+                                "amount": snapshot.dividend_value or 0,
+                                "currency": snapshot.currency or "RUB",
+                                "quantity": holding.quantity,
+                                "total_amount": (snapshot.dividend_value or 0) * holding.quantity,
+                                "provider": snapshot.provider
+                            })
+                
+                except Exception as e:
+                    logger.error(f"Failed to process holding {holding.isin}: {e}")
+                    continue
+            
+            # Sort events by date
+            events.sort(key=lambda x: x["date"])
+            
+            return {
+                "events": events,
+                "month": month,
+                "year": year,
+                "total_events": len(events)
+            }
+            
+        finally:
+            session.close()
+        
+    except Exception as exc:
+        logger.error(f"Failed to get payment calendar: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @app.patch("/api/portfolio/position/{position_id}", response_model=PortfolioResponse)
 def update_position(
     position_id: int,
