@@ -529,7 +529,7 @@ async def get_payment_calendar(
                             events.append({
                                 "date": snapshot.next_coupon_date.isoformat(),
                                 "type": "coupon",
-                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "security_name": snapshot.shortname or snapshot.name or holding.raw_name or holding.ticker or holding.isin,
                                 "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.coupon_value or 0,
@@ -544,7 +544,7 @@ async def get_payment_calendar(
                             events.append({
                                 "date": snapshot.maturity_date.isoformat(),
                                 "type": "maturity",
-                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "security_name": snapshot.shortname or snapshot.name or holding.raw_name or holding.ticker or holding.isin,
                                 "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.face_value or 0,
@@ -560,7 +560,7 @@ async def get_payment_calendar(
                             events.append({
                                 "date": snapshot.next_dividend_date.isoformat(),
                                 "type": "dividend",
-                                "security_name": snapshot.shortname or snapshot.name or holding.ticker or holding.isin,
+                                "security_name": snapshot.shortname or snapshot.name or holding.raw_name or holding.ticker or holding.isin,
                                 "ticker": holding.ticker or snapshot.ticker or holding.isin,
                                 "isin": holding.isin,
                                 "amount": snapshot.dividend_value or 0,
