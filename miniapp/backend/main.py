@@ -472,11 +472,25 @@ async def get_payment_calendar(
             
             # Log debug information
             logger.info(f"Calendar request: month={month}, year={year}, holdings_count={len(holdings)}")
-            logger.info(f"Found {len(events)} events for user {user.id}")
             
             # Debug: log details about each holding
             for holding in holdings:
                 logger.info(f"Holding: {holding.ticker or holding.isin} ({holding.isin}) - {holding.raw_quantity or 0} шт")
+                logger.info(f"  Security type: {holding.security_type}")
+                logger.info(f"  Provider: {holding.provider}")
+                
+                # Try to get snapshot for this holding
+                try:
+                    snapshots = await market_aggregator.get_snapshot_for(holding.isin)
+                    if snapshots:
+                        snapshot = snapshots[0]
+                        logger.info(f"  Snapshot: provider={snapshot.provider}, next_coupon={snapshot.next_coupon_date}, maturity={snapshot.maturity_date}")
+                    else:
+                        logger.info(f"  No snapshot found for {holding.isin}")
+                except Exception as e:
+                    logger.error(f"  Error getting snapshot for {holding.isin}: {e}")
+            
+            logger.info(f"Found {len(events)} events for user {user.id}")
             
             # Sort events by date
             events.sort(key=lambda x: x["date"])
