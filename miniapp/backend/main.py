@@ -476,7 +476,7 @@ async def get_payment_calendar(
             
             # Debug: log details about each holding
             for holding in holdings:
-                logger.info(f"Holding: {holding.name} ({holding.isin}) - {holding.quantity} шт")
+                logger.info(f"Holding: {holding.ticker or holding.isin} ({holding.isin}) - {holding.quantity} шт")
             
             # Sort events by date
             events.sort(key=lambda x: x["date"])
