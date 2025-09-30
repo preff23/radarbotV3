@@ -476,7 +476,9 @@ async def get_payment_calendar(
                                     if moex_results:
                                         moex_secid = moex_results[0].secid
                                         logger.info(f"Requesting MOEX calendar for {holding.isin} (SECID: {moex_secid})")
-                                        calendar_data = await moex_client.get_bond_calendar(moex_secid)
+                                        # Calculate days ahead based on period
+                                        days_ahead = (end_date - start_date).days
+                                        calendar_data = await moex_client.get_bond_calendar(moex_secid, days_ahead=days_ahead)
                                         if calendar_data:
                                             if calendar_data.coupons:
                                                 # Filter coupons by date range
