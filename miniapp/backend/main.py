@@ -410,48 +410,110 @@ async def get_payment_calendar(
             
             # Process each holding to get payment events
             for holding in holdings:
-                # Get detailed security information - force MOEX for bonds to get calendar data
+                # Get detailed security information and calendar data
                 try:
+                    # First get basic snapshot data
+                    snapshots = await market_aggregator.get_snapshot_for(holding.isin)
+                    if not snapshots:
+                        continue
+                    snapshot = snapshots[0]
+                    
+                    # Get calendar data based on security type
                     if holding.security_type == "bond":
-                        # For bonds, try MOEX first to get calendar data
-                        from bot.providers.moex_iss.client import MOEXISSClient
-                        async with MOEXISSClient() as moex_client:
-                            moex_results = await moex_client.search_securities(holding.isin)
-                            if moex_results:
-                                moex_secid = moex_results[0].secid
-                                snapshot = await moex_client.get_bond_marketdata(moex_secid)
-                                if snapshot:
-                                    # Get calendar data
-                                    calendar_data = await moex_client.get_bond_calendar(moex_secid)
-                                    if calendar_data:
-                                        # Extract next coupon date and value
-                                        from datetime import datetime
-                                        next_coupon_date = None
-                                        coupon_value = None
-                                        if calendar_data.coupons:
-                                            now = datetime.now()
-                                            future_coupons = [c for c in calendar_data.coupons if c.coupon_date >= now]
-                                            if future_coupons:
-                                                next_coupon = min(future_coupons, key=lambda x: x.coupon_date)
-                                                next_coupon_date = next_coupon.coupon_date
-                                                coupon_value = next_coupon.coupon_value
+                        # Try to get coupon data from T-Bank if available
+                        if hasattr(snapshot, 'figi') and snapshot.figi:
+                            from bot.providers.tbank_rest import TBankRestClient
+                            async with TBankRestClient() as tbank_client:
+                                try:
+                                    # Get future coupons
+                                    from datetime import datetime, timedelta
+                                    now = datetime.now()
+                                    future_date = now + timedelta(days=365)  # Look ahead 1 year
+                                    
+                                    coupons = await tbank_client.get_bond_coupons(
+                                        snapshot.figi, 
+                                        from_date=now, 
+                                        to_date=future_date
+                                    )
+                                    
+                                    if coupons:
+                                        # Find next coupon
+                                        next_coupon = min(coupons, key=lambda x: x.coupon_date)
+                                        snapshot.next_coupon_date = next_coupon.coupon_date
+                                        snapshot.coupon_value = next_coupon.coupon_value
                                         
-                                        # Extract maturity date
-                                        maturity_date = None
-                                        if calendar_data.amortizations:
-                                            last_amort = max(calendar_data.amortizations, key=lambda x: x.amort_date)
-                                            maturity_date = last_amort.amort_date
+                                        # Find maturity (last coupon)
+                                        last_coupon = max(coupons, key=lambda x: x.coupon_date)
+                                        snapshot.maturity_date = last_coupon.coupon_date
                                         
-                                        # Update snapshot with calendar data
-                                        snapshot.next_coupon_date = next_coupon_date
-                                        snapshot.maturity_date = maturity_date
-                                        snapshot.coupon_value = coupon_value
-                    else:
-                        # For other securities, use regular aggregator
-                        snapshots = await market_aggregator.get_snapshot_for(holding.isin)
-                        if not snapshots:
-                            continue
-                        snapshot = snapshots[0]
+                                        logger.info(f"Found T-Bank calendar data for {holding.isin}: next_coupon={snapshot.next_coupon_date}, maturity={snapshot.maturity_date}")
+                                    
+                                except Exception as e:
+                                    logger.error(f"Failed to get T-Bank coupons for {holding.isin}: {e}")
+                        
+                        # If no T-Bank data, try MOEX
+                        if not snapshot.next_coupon_date:
+                            from bot.providers.moex_iss.client import MOEXISSClient
+                            async with MOEXISSClient() as moex_client:
+                                try:
+                                    moex_results = await moex_client.search_securities(holding.isin)
+                                    if moex_results:
+                                        moex_secid = moex_results[0].secid
+                                        calendar_data = await moex_client.get_bond_calendar(moex_secid)
+                                        if calendar_data:
+                                            # Extract next coupon date and value
+                                            from datetime import datetime
+                                            next_coupon_date = None
+                                            coupon_value = None
+                                            if calendar_data.coupons:
+                                                now = datetime.now()
+                                                future_coupons = [c for c in calendar_data.coupons if c.coupon_date >= now]
+                                                if future_coupons:
+                                                    next_coupon = min(future_coupons, key=lambda x: x.coupon_date)
+                                                    next_coupon_date = next_coupon.coupon_date
+                                                    coupon_value = next_coupon.coupon_value
+                                            
+                                            # Extract maturity date
+                                            maturity_date = None
+                                            if calendar_data.amortizations:
+                                                last_amort = max(calendar_data.amortizations, key=lambda x: x.amort_date)
+                                                maturity_date = last_amort.amort_date
+                                            
+                                            # Update snapshot with calendar data
+                                            snapshot.next_coupon_date = next_coupon_date
+                                            snapshot.maturity_date = maturity_date
+                                            snapshot.coupon_value = coupon_value
+                                            
+                                            logger.info(f"Found MOEX calendar data for {holding.isin}: next_coupon={next_coupon_date}, maturity={maturity_date}")
+                                
+                                except Exception as e:
+                                    logger.error(f"Failed to get MOEX calendar for {holding.isin}: {e}")
+                    
+                    elif holding.security_type == "share":
+                        # Try to get dividend data from T-Bank
+                        if hasattr(snapshot, 'figi') and snapshot.figi:
+                            from bot.providers.tbank_rest import TBankRestClient
+                            async with TBankRestClient() as tbank_client:
+                                try:
+                                    from datetime import datetime, timedelta
+                                    now = datetime.now()
+                                    future_date = now + timedelta(days=365)
+                                    
+                                    dividends = await tbank_client.get_dividends(
+                                        snapshot.figi,
+                                        from_date=now,
+                                        to_date=future_date
+                                    )
+                                    
+                                    if dividends:
+                                        next_dividend = min(dividends, key=lambda x: x.payment_date)
+                                        snapshot.next_dividend_date = next_dividend.payment_date
+                                        snapshot.dividend_value = next_dividend.dividend_net
+                                        
+                                        logger.info(f"Found T-Bank dividend data for {holding.isin}: next_dividend={snapshot.next_dividend_date}")
+                                
+                                except Exception as e:
+                                    logger.error(f"Failed to get T-Bank dividends for {holding.isin}: {e}")
                     
                     # For bonds - get coupon and maturity dates
                     if snapshot and snapshot.security_type == "bond":

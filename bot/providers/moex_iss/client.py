@@ -262,7 +262,7 @@ class MOEXISSClient:
     
     async def get_bond_calendar(self, secid: str, days_ahead: int = 30) -> Optional[BondCalendar]:
         try:
-            url = f"{self.BASE_URL}/statistics/engines/stock/markets/bonds/bondization/{secid}.json"
+            url = f"{self.BASE_URL}/securities/{secid}/bondization.json"
             
             response = await self.client.get(url)
             response.raise_for_status()
