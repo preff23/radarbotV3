@@ -16,6 +16,9 @@ from bot.core.db import (
 from bot.utils.normalize import normalize_security_name, generate_normalized_key, normalize_security_type
 from bot.providers.aggregator import market_aggregator, MarketSnapshot
 from bot.utils.bond_reference import load_bond_reference
+from bot.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class UserContext(BaseModel):
