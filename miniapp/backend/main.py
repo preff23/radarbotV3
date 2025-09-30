@@ -175,14 +175,14 @@ def build_portfolio_response(user_id: int, phone: Optional[str] = None, telegram
 
     # Создаем только один manual аккаунт
     manual_account = AccountResponse(
-        internal_id=None,
+            internal_id=None,
         account_id="manual",
-        account_name="Портфель",
+            account_name="Портфель",
         currency="RUB",
         portfolio_value=0.0,
-        positions=[],
-        cash=[]
-    )
+            positions=[],
+            cash=[]
+        )
 
     # Добавляем все позиции в manual аккаунт
     for holding in summary["holdings"]:
@@ -469,6 +469,14 @@ async def get_payment_calendar(
                 except Exception as e:
                     logger.error(f"Failed to process holding {holding.isin}: {e}")
                     continue
+            
+            # Log debug information
+            logger.info(f"Calendar request: month={month}, year={year}, holdings_count={len(holdings)}")
+            logger.info(f"Found {len(events)} events for user {user.id}")
+            
+            # Debug: log details about each holding
+            for holding in holdings:
+                logger.info(f"Holding: {holding.name} ({holding.isin}) - {holding.quantity} шт")
             
             # Sort events by date
             events.sort(key=lambda x: x["date"])

@@ -139,6 +139,17 @@ class MarketDataAggregator:
                 logger.info(f"Choosing T-Bank over MOEX for '{tbank_snapshot.ticker}' (security type mismatch)")
                 return tbank_snapshot
 
+        # For bonds, prioritize MOEX if it has calendar data
+        if tbank_snapshot.security_type == "bond":
+            moex_has_calendar = (moex_snapshot.next_coupon_date is not None or 
+                                moex_snapshot.maturity_date is not None)
+            tbank_has_calendar = (tbank_snapshot.next_coupon_date is not None or 
+                                 tbank_snapshot.maturity_date is not None)
+            
+            if moex_has_calendar and not tbank_has_calendar:
+                logger.info(f"Choosing MOEX over T-Bank for bond '{tbank_snapshot.ticker}' (has calendar data)")
+                return moex_snapshot
+        
         tbank_has_change = tbank_snapshot.change_day_pct is not None
         moex_has_change = moex_snapshot.change_day_pct is not None
         

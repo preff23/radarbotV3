@@ -212,6 +212,29 @@ class MOEXISSClient:
                         if description and len(description[0]) >= len(description_columns):
                             desc_dict = dict(zip(description_columns, description[0]))
                         
+                        # Get calendar data for coupon and maturity dates
+                        calendar_data = await self.get_bond_calendar(secid)
+                        
+                        # Extract next coupon date and value from calendar
+                        next_coupon_date = None
+                        coupon_value = None
+                        if calendar_data and calendar_data.coupons:
+                            # Find the next coupon
+                            now = datetime.now()
+                            future_coupons = [c for c in calendar_data.coupons if c.coupon_date >= now]
+                            if future_coupons:
+                                next_coupon = min(future_coupons, key=lambda x: x.coupon_date)
+                                next_coupon_date = next_coupon.coupon_date
+                                coupon_value = next_coupon.coupon_value
+                        
+                        # Extract maturity date from amortizations
+                        maturity_date = None
+                        if calendar_data and calendar_data.amortizations:
+                            # Find the last amortization (maturity)
+                            if calendar_data.amortizations:
+                                last_amort = max(calendar_data.amortizations, key=lambda x: x.amort_date)
+                                maturity_date = last_amort.amort_date
+                        
                         return BondSnapshot(
                             secid=secid,
                             shortname=desc_dict.get("shortname", market_dict.get("SECID", "")),
@@ -225,7 +248,10 @@ class MOEXISSClient:
                             board=board,
                             market="bonds",
                             face_value=self._parse_float(securities_dict.get("FACEVALUE")),
-                            volume=self._parse_float(market_dict.get("VOLTODAY"))
+                            volume=self._parse_float(market_dict.get("VOLTODAY")),
+                            next_coupon_date=next_coupon_date,
+                            maturity_date=maturity_date,
+                            coupon_value=coupon_value
                         )
             
             return None
