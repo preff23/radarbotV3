@@ -327,13 +327,21 @@ async def get_security_details(
             except Exception as e:
                 logger.warning(f"Failed to get data by ticker {ticker}: {e}")
         
-        # If no data found by ticker, try by ISIN
-        if not snapshots:
+        # If no data found by ticker, try by ISIN (only if ISIN is not empty)
+        if not snapshots and isin and isin.strip():
             try:
                 snapshots = await market_aggregator.get_snapshot_for(isin)
                 logger.info(f"Found {len(snapshots) if snapshots else 0} snapshots for ISIN {isin}")
             except Exception as e:
                 logger.warning(f"Failed to get data by ISIN {isin}: {e}")
+        
+        # If still no data and we have a ticker, try again with ticker (fallback)
+        if not snapshots and ticker:
+            try:
+                snapshots = await market_aggregator.get_snapshot_for(ticker)
+                logger.info(f"Fallback: Found {len(snapshots) if snapshots else 0} snapshots for ticker {ticker}")
+            except Exception as e:
+                logger.warning(f"Fallback failed to get data by ticker {ticker}: {e}")
         
         if not snapshots:
             raise HTTPException(status_code=404, detail="Security not found")
