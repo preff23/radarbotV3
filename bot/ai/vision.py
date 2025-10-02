@@ -322,6 +322,11 @@ class VisionProcessor:
             # Log the raw content for debugging
             logger.info(f"OCR v3 raw content length: {len(content)}")
             logger.info(f"OCR v3 content preview: {content[:500]}...")
+            
+            # Save full content to file for debugging
+            with open("/tmp/ocr_debug.json", "w", encoding="utf-8") as f:
+                f.write(content)
+            logger.info("Full OCR content saved to /tmp/ocr_debug.json")
 
             try:
                 data = json.loads(content)
