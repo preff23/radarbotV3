@@ -810,9 +810,9 @@ class PortfolioAnalyzer:
                 "5. Дай конкретные действия (держать/сократить/докупать) с обоснованием и рисками.\n"
                 "6. Пиши по-русски, опирайся только на JSON, отмечай, если данных нет.\n"
             )
- 
-                # Format macro data for the prompt
-                macro_block = f"""
+            
+            # Format macro data for the prompt
+            macro_block = f"""
 МАКРО-ДАННЫЕ:
 - Время: {macro_data.get('timestamp', 'Недоступно')}
 - USD/RUB: {macro_data.get('usd_rub', 'Недоступно')}
