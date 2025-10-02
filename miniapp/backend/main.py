@@ -307,8 +307,33 @@ async def get_security_details(
 ):
     """Get detailed information about a security by ISIN."""
     try:
-        # Get market data for the security
-        snapshots = await market_aggregator.get_snapshot_for(isin)
+        # First try to get ticker from database by ISIN
+        ticker = None
+        try:
+            from bot.core.db import db_manager
+            holdings = db_manager.get_holdings_by_isin(user.user_id, isin)
+            if holdings:
+                ticker = holdings[0].ticker
+                logger.info(f"Found ticker {ticker} for ISIN {isin} in database")
+        except Exception as e:
+            logger.warning(f"Could not get ticker from database for ISIN {isin}: {e}")
+        
+        # Try to get market data - first by ticker if available, then by ISIN
+        snapshots = None
+        if ticker:
+            try:
+                snapshots = await market_aggregator.get_snapshot_for(ticker)
+                logger.info(f"Found {len(snapshots) if snapshots else 0} snapshots for ticker {ticker}")
+            except Exception as e:
+                logger.warning(f"Failed to get data by ticker {ticker}: {e}")
+        
+        # If no data found by ticker, try by ISIN
+        if not snapshots:
+            try:
+                snapshots = await market_aggregator.get_snapshot_for(isin)
+                logger.info(f"Found {len(snapshots) if snapshots else 0} snapshots for ISIN {isin}")
+            except Exception as e:
+                logger.warning(f"Failed to get data by ISIN {isin}: {e}")
         
         if not snapshots:
             raise HTTPException(status_code=404, detail="Security not found")

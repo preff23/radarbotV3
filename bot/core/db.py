@@ -298,6 +298,19 @@ class DatabaseManager:
         finally:
             db.close()
     
+    def get_holdings_by_isin(self, user_id: int, isin: str, active_only: bool = True) -> List[PortfolioHoldingV2]:
+        db = self.SessionLocal()
+        try:
+            query = db.query(PortfolioHoldingV2).filter(
+                PortfolioHoldingV2.user_id == user_id,
+                PortfolioHoldingV2.isin == isin
+            )
+            if active_only:
+                query = query.filter(PortfolioHoldingV2.is_active == True)
+            return query.all()
+        finally:
+            db.close()
+    
     def add_holding(self, user_id: int, raw_name: str, normalized_name: str,
                     normalized_key: str, account_internal_id: Optional[int] = None,
                     session: Session = None, **kwargs) -> PortfolioHoldingV2:
