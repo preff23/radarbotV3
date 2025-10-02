@@ -1,0 +1,20 @@
+[Unit]
+Description=RadarBot Price Monitor Service
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/radarbotV3
+Environment=PATH=/home/ubuntu/radarbotV3/venv/bin
+ExecStart=/home/ubuntu/radarbotV3/venv/bin/python bot/commands/price_monitor.py --daemon --bot-token %i
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=radarbot-price-monitor
+
+[Install]
+WantedBy=multi-user.target

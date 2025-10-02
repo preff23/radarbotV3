@@ -311,6 +311,26 @@ class DatabaseManager:
         finally:
             db.close()
     
+    def get_all_users_with_holdings(self) -> List[User]:
+        """Get all users who have active holdings"""
+        db = self.SessionLocal()
+        try:
+            # Get users who have active holdings
+            query = db.query(User).join(PortfolioHoldingV2).filter(
+                PortfolioHoldingV2.is_active == True
+            ).distinct()
+            return query.all()
+        finally:
+            db.close()
+    
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        """Get user by ID"""
+        db = self.SessionLocal()
+        try:
+            return db.query(User).filter(User.id == user_id).first()
+        finally:
+            db.close()
+    
     def add_holding(self, user_id: int, raw_name: str, normalized_name: str,
                     normalized_key: str, account_internal_id: Optional[int] = None,
                     session: Session = None, **kwargs) -> PortfolioHoldingV2:
