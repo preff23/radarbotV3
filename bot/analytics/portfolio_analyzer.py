@@ -581,10 +581,8 @@ class PortfolioAnalyzer:
         
         macro_data = {
             "timestamp": None,
-            "key_rate": None,
             "usd_rub": None,
             "imoex": None,
-            "inflation": None,
             "warnings": []
         }
         
@@ -603,37 +601,6 @@ class PortfolioAnalyzer:
                 macro_data["timestamp"] = f"Время: {moscow_time} (локальное время)"
                 macro_data["warnings"].append("Время получено локально")
             
-            # Get key rate from CBR
-            try:
-                response = requests.get("https://www.cbr.ru/hd_base/keyrate/", timeout=10)
-                if response.status_code == 200:
-                    # Parse key rate from HTML
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    # Look for the latest key rate in the table
-                    tables = soup.find_all('table')
-                    if tables:
-                        rows = tables[0].find_all('tr')
-                        if len(rows) > 1:
-                            # Get the last row (most recent rate)
-                            last_row = rows[-1]
-                            cells = last_row.find_all('td')
-                            if len(cells) >= 2:
-                                rate = cells[1].get_text(strip=True)
-                                date = cells[0].get_text(strip=True)
-                                macro_data["key_rate"] = f"Ключевая ставка ЦБ РФ: {rate}% (действует с {date}); источники: таблица + пресс-релиз"
-                            else:
-                                macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
-                        else:
-                            macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
-                    else:
-                        macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
-                else:
-                    macro_data["warnings"].append("Ключевая ставка недоступна")
-            except Exception as e:
-                logger.warning(f"Failed to parse key rate: {e}")
-                macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
-                macro_data["warnings"].append("Ключевая ставка недоступна")
             
             # Get USD/RUB and EUR/RUB rates from MOEX
             try:
@@ -696,21 +663,6 @@ class PortfolioAnalyzer:
             except:
                 macro_data["warnings"].append("IMOEX недоступен")
             
-            # Get inflation from Rosstat
-            try:
-                # Try to get inflation from Rosstat API or website
-                response = requests.get("https://rosstat.gov.ru/statistics/price", timeout=10)
-                if response.status_code == 200:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    # Look for inflation data (this is a simplified approach)
-                    # In reality, you'd need to parse the specific inflation page
-                    macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
-                else:
-                    macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
-            except Exception as e:
-                logger.warning(f"Failed to parse inflation: {e}")
-                macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
             
         except Exception as e:
             logger.error(f"Failed to get macro data: {e}")
@@ -859,14 +811,12 @@ class PortfolioAnalyzer:
                 "6. Пиши по-русски, опирайся только на JSON, отмечай, если данных нет.\n"
             )
  
-            # Format macro data for the prompt
-            macro_block = f"""
+                # Format macro data for the prompt
+                macro_block = f"""
 МАКРО-ДАННЫЕ:
 - Время: {macro_data.get('timestamp', 'Недоступно')}
-- Ключевая ставка: {macro_data.get('key_rate', 'Недоступно')}
 - USD/RUB: {macro_data.get('usd_rub', 'Недоступно')}
 - IMOEX: {macro_data.get('imoex', 'Недоступно')}
-- Инфляция: {macro_data.get('inflation', 'Недоступно')}
 - Предупреждения: {', '.join(macro_data.get('warnings', [])) if macro_data.get('warnings') else 'Нет'}
 """
 
