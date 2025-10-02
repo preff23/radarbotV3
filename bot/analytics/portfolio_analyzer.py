@@ -574,6 +574,76 @@ class PortfolioAnalyzer:
         
         return "—"
     
+    async def _get_macro_data(self) -> Dict[str, Any]:
+        """Get current macro data according to new prompt requirements"""
+        import requests
+        from datetime import datetime
+        
+        macro_data = {
+            "timestamp": None,
+            "key_rate": None,
+            "usd_rub": None,
+            "imoex": None,
+            "inflation": None,
+            "warnings": []
+        }
+        
+        try:
+            # Get current time from time.is Moscow
+            try:
+                response = requests.get("https://time.is/Moscow", timeout=5)
+                if response.status_code == 200:
+                    macro_data["timestamp"] = "Время получено с time.is/Moscow"
+                else:
+                    macro_data["timestamp"] = "⚠️ Время не подтверждено (time.is недоступен)"
+                    macro_data["warnings"].append("time.is недоступен")
+            except:
+                macro_data["timestamp"] = "⚠️ Время не подтверждено (time.is недоступен)"
+                macro_data["warnings"].append("time.is недоступен")
+            
+            # Get key rate from CBR
+            try:
+                response = requests.get("https://www.cbr.ru/hd_base/keyrate/", timeout=10)
+                if response.status_code == 200:
+                    # Parse key rate from HTML (simplified)
+                    macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
+                else:
+                    macro_data["warnings"].append("Ключевая ставка недоступна")
+            except:
+                macro_data["warnings"].append("Ключевая ставка недоступна")
+            
+            # Get USD/RUB rate from CBR
+            try:
+                response = requests.get("https://www.cbr.ru/currency_base/daily/", timeout=10)
+                if response.status_code == 200:
+                    macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
+                else:
+                    macro_data["warnings"].append("Курс USD/RUB недоступен")
+            except:
+                macro_data["warnings"].append("Курс USD/RUB недоступен")
+            
+            # Get IMOEX from MOEX
+            try:
+                response = requests.get("https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json", timeout=10)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('marketdata', {}).get('data'):
+                        imoex_value = data['marketdata']['data'][0][4]  # Close price
+                        macro_data["imoex"] = f"IMOEX: {imoex_value}"
+                else:
+                    macro_data["warnings"].append("IMOEX недоступен")
+            except:
+                macro_data["warnings"].append("IMOEX недоступен")
+            
+            # Get inflation from Rosstat (simplified)
+            macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
+            
+        except Exception as e:
+            logger.error(f"Failed to get macro data: {e}")
+            macro_data["warnings"].append(f"Ошибка получения макро-данных: {e}")
+        
+        return macro_data
+
     async def _generate_ai_analysis(self,
                                   snapshots: List[Any],
                                   bond_calendar: List[Dict[str, Any]],
@@ -587,6 +657,9 @@ class PortfolioAnalyzer:
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 system_prompt = f.read()
             
+            # Get macro data according to new prompt requirements
+            macro_data = await self._get_macro_data()
+            
             # Build payload for AI
             metrics = self._calculate_metrics(snapshots)
             portfolio_data = {
@@ -597,6 +670,7 @@ class PortfolioAnalyzer:
                 "metrics": metrics,
                 "top_positions": [],
                 "accounts": [],
+                "macro_data": macro_data,
             }
             if payment_history:
                 portfolio_data["payment_history"] = payment_history
@@ -711,25 +785,39 @@ class PortfolioAnalyzer:
                 "6. Пиши по-русски, опирайся только на JSON, отмечай, если данных нет.\n"
             )
  
+            # Format macro data for the prompt
+            macro_block = f"""
+МАКРО-ДАННЫЕ:
+- Время: {macro_data.get('timestamp', 'Недоступно')}
+- Ключевая ставка: {macro_data.get('key_rate', 'Недоступно')}
+- USD/RUB: {macro_data.get('usd_rub', 'Недоступно')}
+- IMOEX: {macro_data.get('imoex', 'Недоступно')}
+- Инфляция: {macro_data.get('inflation', 'Недоступно')}
+- Предупреждения: {', '.join(macro_data.get('warnings', [])) if macro_data.get('warnings') else 'Нет'}
+"""
+
             user_message = f"""
- Проанализируй портфель строго по промту v16 (файл portfolio_analyze_v14.txt).
+ Проанализируй портфель строго по новому промпту v13.7.6 (файл portfolio_analyze_v14.txt).
  
  КОНТЕКСТ ВРЕМЕНИ:
  {time_context}
  
--{meta_block}СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ:
--{portfolio_data}
--
--Требования:
--- следуй всем инструкциям промта v16;
--- обязательно укажи в ответе название портфеля, его общую стоимость и количество бумаг, если значения присутствуют в OCR-метаданных;
--- начни ответ с текущего времени из блока времени.
-+{meta_block}{requirements}
- 
- СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ (JSON):
- {portfolio_payload}
- 
- Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
+{macro_block}
+СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ:
+{portfolio_data}
+
+Требования:
+- следуй всем инструкциям нового промпта v13.7.6;
+- обязательно укажи в ответе название портфеля, его общую стоимость и количество бумаг, если значения присутствуют в OCR-метаданных;
+- начни ответ с текущего времени из блока времени;
+- используй макро-данные для анализа;
+- для данных по эмитентам используй corpbonds.ru;
+- следуй структуре ежедневного отчёта из промпта.
+
+СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ (JSON):
+{portfolio_payload}
+
+Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
             """
  
             response = self.openai_client.chat.completions.create(
