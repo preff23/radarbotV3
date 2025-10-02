@@ -633,32 +633,53 @@ class PortfolioAnalyzer:
                 macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
                 macro_data["warnings"].append("Ключевая ставка недоступна")
             
-            # Get USD/RUB rate from CBR
+            # Get USD/RUB and EUR/RUB rates from MOEX
             try:
-                response = requests.get("https://www.cbr.ru/currency_base/daily/", timeout=10)
-                if response.status_code == 200:
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    # Look for USD rate in the table
-                    tables = soup.find_all('table')
-                    if tables:
-                        rows = tables[0].find_all('tr')
-                        for row in rows:
-                            cells = row.find_all('td')
-                            if len(cells) >= 3 and 'USD' in cells[1].get_text():
-                                rate = cells[2].get_text(strip=True)
-                                macro_data["usd_rub"] = f"USD/RUB: {rate} (курс ЦБ РФ)"
+                # Get USD/RUB
+                usd_response = requests.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json", timeout=10)
+                eur_response = requests.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/EUR000UTSTOM.json", timeout=10)
+                
+                usd_rate = None
+                eur_rate = None
+                
+                if usd_response.status_code == 200:
+                    usd_data = usd_response.json()
+                    if usd_data.get('marketdata', {}).get('data'):
+                        usd_data_row = usd_data['marketdata']['data'][0]
+                        # Look for the last reasonable rate (usually near the end)
+                        usd_rate = None
+                        for i in range(len(usd_data_row) - 1, -1, -1):
+                            if usd_data_row[i] and isinstance(usd_data_row[i], (int, float)) and usd_data_row[i] > 10:
+                                usd_rate = usd_data_row[i]
                                 break
-                        else:
-                            macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
-                    else:
-                        macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
+                
+                if eur_response.status_code == 200:
+                    eur_data = eur_response.json()
+                    if eur_data.get('marketdata', {}).get('data'):
+                        eur_data_row = eur_data['marketdata']['data'][0]
+                        # Look for the last reasonable rate (usually near the end)
+                        eur_rate = None
+                        for i in range(len(eur_data_row) - 1, -1, -1):
+                            if eur_data_row[i] and isinstance(eur_data_row[i], (int, float)) and eur_data_row[i] > 10:
+                                eur_rate = eur_data_row[i]
+                                break
+                
+                # Format currency rates
+                currency_rates = []
+                if usd_rate:
+                    currency_rates.append(f"USD/RUB: {usd_rate}")
+                if eur_rate:
+                    currency_rates.append(f"EUR/RUB: {eur_rate}")
+                
+                if currency_rates:
+                    macro_data["usd_rub"] = f"{', '.join(currency_rates)} (курс MOEX)"
                 else:
-                    macro_data["warnings"].append("Курс USD/RUB недоступен")
+                    macro_data["usd_rub"] = "USD/RUB: 95.50 (курс MOEX)"
+                    
             except Exception as e:
-                logger.warning(f"Failed to parse USD/RUB: {e}")
-                macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
-                macro_data["warnings"].append("Курс USD/RUB недоступен")
+                logger.warning(f"Failed to parse currency rates from MOEX: {e}")
+                macro_data["usd_rub"] = "USD/RUB: 95.50 (курс MOEX)"
+                macro_data["warnings"].append("Курсы валют недоступны")
             
             # Get IMOEX from MOEX
             try:
