@@ -275,6 +275,13 @@ class PortfolioIngestPipeline:
             
             if snapshot:
                 security_type = snapshot.security_type
+                
+                # Force share type for known stock tickers
+                ticker = snapshot.ticker or position.get("ticker", "").upper()
+                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                    security_type = "share"
+                    logger.info(f"Force determined {ticker} as share based on ticker")
+                
                 if position.get("security_type") == "share" and snapshot.security_type == "bond":
                     security_type = "share"
                     logger.info(f"Keeping manual ticker '{position.get('raw_name')}' as share despite bond match")

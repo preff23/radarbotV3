@@ -296,7 +296,20 @@ class MarketDataAggregator:
             secid = resolved["secid"]
             security_type = resolved.get("type", "unknown")
             
-            if security_type in ["share", "stock", "common_share", "preferred_share"]:
+            # If MOEX doesn't provide clear type, try to determine from ticker
+            if not security_type or security_type == "unknown":
+                ticker = resolved.get("shortname", "").upper()
+                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                    security_type = "share"
+                    logger.info(f"Determined {ticker} as share based on ticker")
+                elif ticker and len(ticker) > 3 and ticker.startswith("RU"):
+                    security_type = "bond"
+                    logger.info(f"Determined {ticker} as bond based on ticker pattern")
+            
+            logger.info(f"MOEX resolved '{query}' -> {resolved.get('shortname')} (type: {security_type})")
+            
+            # Check if it's a share type - be more flexible with MOEX types
+            if security_type and ("share" in security_type.lower() or "stock" in security_type.lower() or security_type.lower() in ["share", "stock", "common_share", "preferred_share", "ordinary_share"]):
                 share_snapshot = await self.moex_bridge.share_snapshot(secid)
                 if share_snapshot:
                     return MarketSnapshot(
@@ -316,7 +329,8 @@ class MarketDataAggregator:
                         volume=share_snapshot.volume
                     )
             
-            elif security_type in ["bond", "corporate_bond", "government_bond", "exchange_bond"]:
+            # Check if it's a bond type - be more flexible with MOEX types
+            elif security_type and ("bond" in security_type.lower() or security_type.lower() in ["bond", "corporate_bond", "government_bond", "exchange_bond", "corporate", "government"]):
                 bond_snapshot = await self.moex_bridge.bond_snapshot(secid)
                 if bond_snapshot:
                     return MarketSnapshot(
