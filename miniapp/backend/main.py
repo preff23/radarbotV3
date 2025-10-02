@@ -311,7 +311,7 @@ async def get_security_details(
         ticker = None
         try:
             from bot.core.db import db_manager
-            holdings = db_manager.get_holdings_by_isin(user.user_id, isin)
+            holdings = db_manager.get_holdings_by_isin(user.id, isin)
             if holdings:
                 ticker = holdings[0].ticker
                 logger.info(f"Found ticker {ticker} for ISIN {isin} in database")
