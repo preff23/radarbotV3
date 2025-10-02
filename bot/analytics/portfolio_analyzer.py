@@ -589,17 +589,19 @@ class PortfolioAnalyzer:
         }
         
         try:
-            # Get current time from time.is Moscow
+            # Get current time (Moscow timezone)
             try:
-                response = requests.get("https://time.is/Moscow", timeout=5)
-                if response.status_code == 200:
-                    macro_data["timestamp"] = "Время получено с time.is/Moscow"
-                else:
-                    macro_data["timestamp"] = "⚠️ Время не подтверждено (time.is недоступен)"
-                    macro_data["warnings"].append("time.is недоступен")
-            except:
-                macro_data["timestamp"] = "⚠️ Время не подтверждено (time.is недоступен)"
-                macro_data["warnings"].append("time.is недоступен")
+                from datetime import datetime
+                import pytz
+                moscow_tz = pytz.timezone('Europe/Moscow')
+                moscow_time = datetime.now(moscow_tz).strftime('%d.%m.%Y, %H:%M МСК')
+                macro_data["timestamp"] = f"Время: {moscow_time} (Московское время)"
+            except Exception as e:
+                # Fallback to local time
+                from datetime import datetime
+                moscow_time = datetime.now().strftime('%d.%m.%Y, %H:%M МСК')
+                macro_data["timestamp"] = f"Время: {moscow_time} (локальное время)"
+                macro_data["warnings"].append("Время получено локально")
             
             # Get key rate from CBR
             try:
