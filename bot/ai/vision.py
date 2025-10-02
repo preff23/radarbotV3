@@ -319,12 +319,25 @@ class VisionProcessor:
                 content = content[:-3]
             content = content.strip()
 
+            # Log the raw content for debugging
+            logger.info(f"OCR v3 raw content length: {len(content)}")
+            logger.info(f"OCR v3 content preview: {content[:500]}...")
+
             try:
                 data = json.loads(content)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse OCR v3 response: {e}")
+                logger.error(f"Content around error position: {content[max(0, e.pos-50):e.pos+50]}")
+                
+                # Try to find JSON in the content
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
-                    data = json.loads(json_match.group())
+                    try:
+                        data = json.loads(json_match.group())
+                        logger.info("Successfully parsed JSON after regex extraction")
+                    except json.JSONDecodeError as e2:
+                        logger.error(f"Failed to parse extracted JSON: {e2}")
+                        return OCRResult(accounts=[], cash_positions=[], reason="error", is_portfolio=False, warnings=["json_parse_failed"])
                 else:
                     logger.error("No valid JSON found in OCR response")
                     return OCRResult(accounts=[], cash_positions=[], reason="error", is_portfolio=False, warnings=["json_parse_failed"])
