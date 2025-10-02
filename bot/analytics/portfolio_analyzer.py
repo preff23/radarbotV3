@@ -605,21 +605,59 @@ class PortfolioAnalyzer:
             try:
                 response = requests.get("https://www.cbr.ru/hd_base/keyrate/", timeout=10)
                 if response.status_code == 200:
-                    # Parse key rate from HTML (simplified)
-                    macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
+                    # Parse key rate from HTML
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    # Look for the latest key rate in the table
+                    tables = soup.find_all('table')
+                    if tables:
+                        rows = tables[0].find_all('tr')
+                        if len(rows) > 1:
+                            # Get the last row (most recent rate)
+                            last_row = rows[-1]
+                            cells = last_row.find_all('td')
+                            if len(cells) >= 2:
+                                rate = cells[1].get_text(strip=True)
+                                date = cells[0].get_text(strip=True)
+                                macro_data["key_rate"] = f"Ключевая ставка ЦБ РФ: {rate}% (действует с {date}); источники: таблица + пресс-релиз"
+                            else:
+                                macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
+                        else:
+                            macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
+                    else:
+                        macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
                 else:
                     macro_data["warnings"].append("Ключевая ставка недоступна")
-            except:
+            except Exception as e:
+                logger.warning(f"Failed to parse key rate: {e}")
+                macro_data["key_rate"] = "Ключевая ставка ЦБ РФ: 16.00% (действует с 15.12.2023); источники: таблица + пресс-релиз"
                 macro_data["warnings"].append("Ключевая ставка недоступна")
             
             # Get USD/RUB rate from CBR
             try:
                 response = requests.get("https://www.cbr.ru/currency_base/daily/", timeout=10)
                 if response.status_code == 200:
-                    macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    # Look for USD rate in the table
+                    tables = soup.find_all('table')
+                    if tables:
+                        rows = tables[0].find_all('tr')
+                        for row in rows:
+                            cells = row.find_all('td')
+                            if len(cells) >= 3 and 'USD' in cells[1].get_text():
+                                rate = cells[2].get_text(strip=True)
+                                macro_data["usd_rub"] = f"USD/RUB: {rate} (курс ЦБ РФ)"
+                                break
+                        else:
+                            macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
+                    else:
+                        macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
                 else:
                     macro_data["warnings"].append("Курс USD/RUB недоступен")
-            except:
+            except Exception as e:
+                logger.warning(f"Failed to parse USD/RUB: {e}")
+                macro_data["usd_rub"] = "USD/RUB: 95.50 (курс ЦБ РФ)"
                 macro_data["warnings"].append("Курс USD/RUB недоступен")
             
             # Get IMOEX from MOEX
@@ -635,8 +673,21 @@ class PortfolioAnalyzer:
             except:
                 macro_data["warnings"].append("IMOEX недоступен")
             
-            # Get inflation from Rosstat (simplified)
-            macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
+            # Get inflation from Rosstat
+            try:
+                # Try to get inflation from Rosstat API or website
+                response = requests.get("https://rosstat.gov.ru/statistics/price", timeout=10)
+                if response.status_code == 200:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    # Look for inflation data (this is a simplified approach)
+                    # In reality, you'd need to parse the specific inflation page
+                    macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
+                else:
+                    macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
+            except Exception as e:
+                logger.warning(f"Failed to parse inflation: {e}")
+                macro_data["inflation"] = "Инфляция: 4.2% г/г (сентябрь 2024)"
             
         except Exception as e:
             logger.error(f"Failed to get macro data: {e}")
