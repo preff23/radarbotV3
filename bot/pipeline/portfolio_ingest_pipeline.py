@@ -172,6 +172,16 @@ class PortfolioIngestPipeline:
             
             normalized_type = normalize_security_type(position.raw_type)
             
+            # If no type determined, try to determine from ticker
+            if not normalized_type and ticker:
+                ticker_upper = ticker.upper()
+                if ticker_upper in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                    normalized_type = "акция"
+                    logger.info(f"Determined {ticker_upper} as акция based on ticker in pipeline")
+                elif ticker_upper and len(ticker_upper) > 3 and ticker_upper.startswith("RU"):
+                    normalized_type = "облигация"
+                    logger.info(f"Determined {ticker_upper} as облигация based on ticker pattern in pipeline")
+            
             normalized_key = generate_normalized_key(normalized_name, ticker, isin)
             if not normalized_key:
                 normalized_key = f"RAW:{position.raw_name}"
@@ -281,6 +291,11 @@ class PortfolioIngestPipeline:
                 if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
                     security_type = "share"
                     logger.info(f"Force determined {ticker} as share based on ticker")
+                
+                # Force share type if position was determined as акция in pipeline
+                if position.get("security_type") == "акция":
+                    security_type = "share"
+                    logger.info(f"Force determined {ticker} as share based on pipeline classification")
                 
                 if position.get("security_type") == "share" and snapshot.security_type == "bond":
                     security_type = "share"
