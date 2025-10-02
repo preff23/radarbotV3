@@ -175,7 +175,7 @@ class PortfolioIngestPipeline:
             # If no type determined, try to determine from ticker
             if not normalized_type and ticker:
                 ticker_upper = ticker.upper()
-                if ticker_upper in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                if ticker_upper in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT", "ROSB", "MOEX", "RUAL", "NLMK", "CHMF", "MTSS", "PHOR", "RSTI", "SBERP", "TATN", "SNGS", "SNGSP", "GMKN", "ALRS", "POLY", "HYDR", "IRAO", "FEES", "MVID", "OZON", "QIWI", "DSKY", "FIVE", "LENTA", "MGNT", "MGTSP", "RENI", "RTKM", "RTKMP", "SELG", "SELGP", "SMLT", "SMLTP", "TATNP", "TRNFP", "UPRO", "UPROP", "VRSB", "VRSBP", "YNDXP"]:
                     normalized_type = "акция"
                     logger.info(f"Determined {ticker_upper} as акция based on ticker in pipeline")
                 elif ticker_upper and len(ticker_upper) > 3 and ticker_upper.startswith("RU"):
@@ -288,7 +288,7 @@ class PortfolioIngestPipeline:
                 
                 # Force share type for known stock tickers
                 ticker = snapshot.ticker or position.get("ticker", "").upper()
-                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT", "ROSB", "MOEX", "RUAL", "NLMK", "CHMF", "MTSS", "PHOR", "RSTI", "SBERP", "TATN", "SNGS", "SNGSP", "GMKN", "ALRS", "POLY", "HYDR", "IRAO", "FEES", "MVID", "OZON", "QIWI", "DSKY", "FIVE", "LENTA", "MGNT", "MGTSP", "RENI", "RTKM", "RTKMP", "SELG", "SELGP", "SMLT", "SMLTP", "TATNP", "TRNFP", "UPRO", "UPROP", "VRSB", "VRSBP", "YNDXP"]:
                     security_type = "share"
                     logger.info(f"Force determined {ticker} as share based on ticker")
                 

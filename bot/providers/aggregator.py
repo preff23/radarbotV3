@@ -299,7 +299,7 @@ class MarketDataAggregator:
             # If MOEX doesn't provide clear type, try to determine from ticker
             if not security_type or security_type == "unknown":
                 ticker = resolved.get("shortname", "").upper()
-                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT"]:
+                if ticker in ["GAZP", "SBER", "LKOH", "ROSN", "NVTK", "MAGN", "YNDX", "TCSG", "VKCO", "AFLT", "ROSB", "MOEX", "RUAL", "NLMK", "CHMF", "MTSS", "PHOR", "RSTI", "SBERP", "TATN", "SNGS", "SNGSP", "GMKN", "ALRS", "POLY", "HYDR", "IRAO", "FEES", "MVID", "OZON", "QIWI", "DSKY", "FIVE", "LENTA", "MGNT", "MGTSP", "RENI", "RTKM", "RTKMP", "SELG", "SELGP", "SMLT", "SMLTP", "TATNP", "TRNFP", "UPRO", "UPROP", "VRSB", "VRSBP", "YNDXP"]:
                     security_type = "share"
                     logger.info(f"Determined {ticker} as share based on ticker")
                 elif ticker and len(ticker) > 3 and ticker.startswith("RU"):
