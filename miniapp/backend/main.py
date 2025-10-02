@@ -300,23 +300,31 @@ async def search_securities(
     return SearchResponse(results=results)
 
 
-@app.get("/api/portfolio/security/{isin}/details")
+@app.get("/api/portfolio/security/{identifier}/details")
 async def get_security_details(
-    isin: str,
+    identifier: str,
     user: UserContext = Depends(get_current_user)
 ):
-    """Get detailed information about a security by ISIN."""
+    """Get detailed information about a security by ISIN or ticker."""
     try:
-        # First try to get ticker from database by ISIN
+        # Determine if identifier is ISIN or ticker
+        is_isin = len(identifier) == 12 and identifier.startswith('RU')
+        
+        # First try to get ticker from database by ISIN (if identifier is ISIN)
         ticker = None
-        try:
-            from bot.core.db import db_manager
-            holdings = db_manager.get_holdings_by_isin(user.id, isin)
-            if holdings:
-                ticker = holdings[0].ticker
-                logger.info(f"Found ticker {ticker} for ISIN {isin} in database")
-        except Exception as e:
-            logger.warning(f"Could not get ticker from database for ISIN {isin}: {e}")
+        if is_isin:
+            try:
+                from bot.core.db import db_manager
+                holdings = db_manager.get_holdings_by_isin(user.id, identifier)
+                if holdings:
+                    ticker = holdings[0].ticker
+                    logger.info(f"Found ticker {ticker} for ISIN {identifier} in database")
+            except Exception as e:
+                logger.warning(f"Could not get ticker from database for ISIN {identifier}: {e}")
+        else:
+            # If identifier is a ticker, use it directly
+            ticker = identifier
+            logger.info(f"Using identifier {identifier} as ticker")
         
         # Try to get market data - first by ticker if available, then by ISIN
         snapshots = None
@@ -327,13 +335,13 @@ async def get_security_details(
             except Exception as e:
                 logger.warning(f"Failed to get data by ticker {ticker}: {e}")
         
-        # If no data found by ticker, try by ISIN (only if ISIN is not empty)
-        if not snapshots and isin and isin.strip():
+        # If no data found by ticker, try by ISIN (only if identifier is ISIN and not empty)
+        if not snapshots and is_isin and identifier.strip():
             try:
-                snapshots = await market_aggregator.get_snapshot_for(isin)
-                logger.info(f"Found {len(snapshots) if snapshots else 0} snapshots for ISIN {isin}")
+                snapshots = await market_aggregator.get_snapshot_for(identifier)
+                logger.info(f"Found {len(snapshots) if snapshots else 0} snapshots for ISIN {identifier}")
             except Exception as e:
-                logger.warning(f"Failed to get data by ISIN {isin}: {e}")
+                logger.warning(f"Failed to get data by ISIN {identifier}: {e}")
         
         # If still no data and we have a ticker, try again with ticker (fallback)
         if not snapshots and ticker:
@@ -349,11 +357,11 @@ async def get_security_details(
         snapshot = snapshots[0]  # Get the first (most relevant) snapshot
         
         # Log the snapshot data for debugging
-        logger.info(f"Security details for {isin}: duration={snapshot.duration}, face_value={snapshot.face_value}, provider={snapshot.provider}")
+        logger.info(f"Security details for {identifier}: duration={snapshot.duration}, face_value={snapshot.face_value}, provider={snapshot.provider}")
         
         # Build detailed response
         details = {
-            "isin": snapshot.isin,
+            "isin": snapshot.isin or identifier if is_isin else None,
             "ticker": snapshot.ticker,
             "name": snapshot.name,
             "shortname": snapshot.shortname,
