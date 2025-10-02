@@ -133,6 +133,7 @@ class NotificationService:
                         sent_count += 1
                     
                     # Small delay between messages to avoid rate limiting
+                    import asyncio
                     await asyncio.sleep(0.1)
                     
             except Exception as e:
