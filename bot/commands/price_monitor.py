@@ -62,7 +62,7 @@ async def main():
     parser.add_argument("--once", action="store_true", help="Run monitoring once and exit")
     parser.add_argument("--daemon", action="store_true", help="Run as daemon (continuous monitoring)")
     parser.add_argument("--bot-token", help="Telegram bot token for notifications")
-    parser.add_argument("--threshold", type=float, default=1.0, help="Price change threshold in percent")
+    parser.add_argument("--threshold", type=float, default=0.01, help="Price change threshold in percent")
     
     args = parser.parse_args()
     
