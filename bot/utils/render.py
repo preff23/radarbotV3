@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from bot.providers.aggregator import MarketSnapshot
 from bot.core.logging import get_logger
 
@@ -339,23 +339,33 @@ async def render_single_signal_card(snapshot: MarketSnapshot) -> str:
 
 def render_calendar_30d(calendar_data: List[Dict[str, Any]]) -> str:
     if not calendar_data:
-        return "📅 •КАЛЕНДАРЬ ВЫПЛАТ (30 ДНЕЙ)•\n\n❌ Нет предстоящих выплат в ближайшие 30 дней"
+        return "📅 •КАЛЕНДАРЬ ВЫПЛАТ (7 ДНЕЙ)•\n\n❌ Нет предстоящих выплат в ближайшие 7 дней"
     
     current_date = datetime.now()
+    end_date = current_date + timedelta(days=7)  # Only next 7 days
     logger.info(f"Rendering calendar with {len(calendar_data)} events")
     logger.info(f"Current date: {current_date}")
+    logger.info(f"End date (30 days): {end_date}")
     
     future_events = []
     for event in calendar_data:
         event_date = event.get("date")
         logger.info(f"Event: {event.get('secid', 'unknown')} - date: {event_date}, type: {event.get('type', 'unknown')}")
-        if event_date and event_date >= current_date:
-            future_events.append(event)
-            logger.info(f"  -> Added to future events")
+        
+        # Debug: check date comparison
+        if event_date:
+            is_within_range = current_date <= event_date <= end_date
+            logger.info(f"  Date check: {current_date} <= {event_date} <= {end_date} = {is_within_range}")
+            
+            if is_within_range:
+                future_events.append(event)
+                logger.info(f"  -> Added to future events (within 30 days)")
+            else:
+                logger.info(f"  -> Skipped (outside 30-day range)")
         else:
-            logger.info(f"  -> Skipped (past date or no date)")
+            logger.info(f"  -> Skipped (no date)")
     
-    logger.info(f"Found {len(future_events)} future events")
+    logger.info(f"Found {len(future_events)} future events within 30 days")
     
     if not future_events:
         return "📅 •КАЛЕНДАРЬ ВЫПЛАТ (30 ДНЕЙ)•\n\n❌ Нет предстоящих выплат в ближайшие 30 дней"
@@ -663,15 +673,7 @@ def render_recommendations(snapshots: List[MarketSnapshot]) -> str:
         recommendations.append("└─────────────────────────────────")
         recommendations.append("")
     
-    if monitor_risk:
-        recommendations.append("🟠 **Позиции для мониторинга:**")
-        recommendations.append("┌─────────────────────────────────")
-        for snapshot in monitor_risk:
-            name = snapshot.name or snapshot.ticker or snapshot.secid
-            risk = get_risk_level(snapshot)
-            recommendations.append(f"│ 👁️ {name} - {risk}")
-        recommendations.append("└─────────────────────────────────")
-        recommendations.append("")
+    # Убрана секция "Позиции для мониторинга"
     
     declining = [s for s in snapshots if get_trend(s) == "Падение"]
     if declining:

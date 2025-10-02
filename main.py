@@ -182,23 +182,43 @@ async def message_handler(update, context):
                 return
 
         if context.user_data.get('waiting_for_photo'):
-            if update.message:
-                await update.message.reply_text(
-                    "Ожидаю фото портфеля. Отправьте изображение или вернитесь в меню /portfolio."
-                )
-            return
+            # Если пользователь написал текстовое сообщение, выходим из режима ожидания фото
+            if update.message and update.message.text:
+                context.user_data.pop('waiting_for_photo', None)
+                # Продолжаем обработку как обычное текстовое сообщение
+            else:
+                if update.message:
+                    await update.message.reply_text(
+                        "Ожидаю фото портфеля. Отправьте изображение или напишите текстовое сообщение для выхода из режима загрузки фото."
+                    )
+                return
 
         if context.user_data.get('waiting_for_ticker'):
-            await portfolio_handler.handle_ticker_input(update, context)
-            return
+            # Если пользователь написал текстовое сообщение, выходим из режима ожидания тикера
+            if update.message and update.message.text:
+                context.user_data.pop('waiting_for_ticker', None)
+                # Продолжаем обработку как обычное текстовое сообщение
+            else:
+                await portfolio_handler.handle_ticker_input(update, context)
+                return
 
         message_text = update.message.text
 
-        await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+        # Показываем анимацию "Генерирую сообщение"
+        from bot.utils.typing_animation import show_typing_animation
+        animation = await show_typing_animation(context.bot, update.effective_chat.id, "Генерирую сообщение")
 
-        response = await invest_analyst.chat_with_user(phone_number, message_text)
-
-        await update.message.reply_text(response, parse_mode='Markdown')
+        try:
+            response = await invest_analyst.chat_with_user(phone_number, message_text)
+            
+            # Останавливаем анимацию и отправляем ответ
+            await animation.stop()
+            await update.message.reply_text(response, parse_mode='Markdown')
+            
+        except Exception as e:
+            # Останавливаем анимацию в случае ошибки
+            await animation.stop()
+            raise e
 
     except Exception as e:
         logger.error(f"Error in message handler: {e}")

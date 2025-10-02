@@ -277,7 +277,9 @@ class MOEXISSClient:
                 if len(row) >= len(coupon_columns):
                     coupon_dict = dict(zip(coupon_columns, row))
                     coupon_date = self._parse_date(coupon_dict.get("coupondate"))
-                    if coupon_date and coupon_date >= datetime.now() and coupon_date <= datetime.now() + timedelta(days=days_ahead):
+                    # Строгая проверка: только текущий год
+                    current_year = datetime.now().year
+                    if coupon_date and coupon_date >= datetime.now() and coupon_date <= datetime.now() + timedelta(days=days_ahead) and coupon_date.year == current_year:
                         coupon = CouponEvent(
                             secid=secid,
                             coupon_date=coupon_date,
@@ -294,7 +296,9 @@ class MOEXISSClient:
                 if len(row) >= len(amort_columns):
                     amort_dict = dict(zip(amort_columns, row))
                     amort_date = self._parse_date(amort_dict.get("amortdate"))
-                    if amort_date and amort_date >= datetime.now() and amort_date <= datetime.now() + timedelta(days=days_ahead):
+                    # Строгая проверка: только текущий год
+                    current_year = datetime.now().year
+                    if amort_date and amort_date >= datetime.now() and amort_date <= datetime.now() + timedelta(days=days_ahead) and amort_date.year == current_year:
                         amort = AmortizationEvent(
                             secid=secid,
                             amort_date=amort_date,

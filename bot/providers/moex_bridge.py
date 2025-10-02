@@ -102,7 +102,7 @@ class MOEXBridge:
     
     async def bond_calendar_30d(self, secid: str) -> Optional[BondCalendar]:
         try:
-            return await self.client.get_bond_calendar(secid, days_ahead=365)
+            return await self.client.get_bond_calendar(secid, days_ahead=7)  # Сократили до 7 дней
         except Exception as e:
             logger.error(f"Failed to get bond calendar for {secid}: {e}")
             return None

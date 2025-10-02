@@ -9,6 +9,7 @@ from bot.providers.aggregator import market_aggregator
 from bot.sources.news_rss import get_news_for_portfolio
 from bot.utils.integrated_bond_client import IntegratedBondClient
 from bot.analytics.payment_history import PaymentHistoryAnalyzer
+from bot.services.corpbonds_service import corpbonds_service
 from bot.utils.render import (
     render_signals_as_cards, render_calendar_30d, render_news_summary,
     render_portfolio_summary, render_recommendations, render_payment_history
@@ -811,6 +812,14 @@ class PortfolioAnalyzer:
                 "6. Пиши по-русски, опирайся только на JSON, отмечай, если данных нет.\n"
             )
             
+            # Get corpbonds.ru data for bonds in portfolio
+            logger.info("Fetching corpbonds.ru data for portfolio bonds...")
+            bond_isins = [snapshot.isin for snapshot in snapshots if snapshot.isin and snapshot.isin.startswith('RU')]
+            corpbonds_data = {}
+            if bond_isins:
+                corpbonds_data = await corpbonds_service.get_multiple_bonds_data(bond_isins)
+                logger.info(f"Retrieved corpbonds.ru data for {len([d for d in corpbonds_data.values() if 'error' not in d])}/{len(bond_isins)} bonds")
+            
             # Format macro data for the prompt
             macro_block = f"""
 МАКРО-ДАННЫЕ:
@@ -820,22 +829,28 @@ class PortfolioAnalyzer:
 - Предупреждения: {', '.join(macro_data.get('warnings', [])) if macro_data.get('warnings') else 'Нет'}
 """
 
+            # Format corpbonds.ru data for AI
+            corpbonds_block = corpbonds_service.format_for_ai_analysis(corpbonds_data)
+            
             user_message = f"""
- Проанализируй портфель строго по новому промпту v13.7.6 (файл portfolio_analyze_v14.txt).
+ Проанализируй портфель строго по новому промпту v14.5 (файл portfolio_analyze_v14.txt).
  
  КОНТЕКСТ ВРЕМЕНИ:
  {time_context}
  
 {macro_block}
+
+{corpbonds_block}
+
 СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ:
 {portfolio_data}
 
 Требования:
-- следуй всем инструкциям нового промпта v13.7.6;
+- следуй всем инструкциям нового промпта v14.5;
 - обязательно укажи в ответе название портфеля, его общую стоимость и количество бумаг, если значения присутствуют в OCR-метаданных;
 - начни ответ с текущего времени из блока времени;
 - используй макро-данные для анализа;
-- для данных по эмитентам используй corpbonds.ru;
+- для данных по эмитентам используй базу знаний ChatGPT И данные corpbonds.ru выше;
 - следуй структуре ежедневного отчёта из промпта.
 
 СТРУКТУРИРОВАННЫЕ ДАННЫЕ ПОРТФЕЛЯ (JSON):
@@ -845,12 +860,12 @@ class PortfolioAnalyzer:
             """
  
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=3000,
+                max_tokens=16000,
                 temperature=0.1
             )
             

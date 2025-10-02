@@ -9,6 +9,8 @@ from bot.sources.news_rss import NewsAggregator
 from bot.utils.moex_client import MOEXClient
 from bot.providers.moex_iss.client import MOEXISSClient
 from bot.providers.aggregator import market_aggregator
+from bot.services.ai_corpbonds_integration import ai_corpbonds
+from bot.services.smart_data_loader import SmartDataLoader
 from bot.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -26,22 +28,20 @@ class InvestAnalyst:
         self.moex_client = MOEXClient()
         self.moex_iss_client = MOEXISSClient()
         self.market_aggregator = market_aggregator
+        self.smart_data_loader = SmartDataLoader(self)
     
     async def chat_with_user(self, phone_number: str, message: str) -> str:
         try:
             portfolio_data = await self._get_user_portfolio_data(phone_number)
             
-            market_context = await self._get_market_context()
+            # Умная загрузка данных - ИИ сам решает, что ему нужно
+            market_context = await self.smart_data_loader.get_smart_context(message, portfolio_data)
             
-            # Получаем альтернативные бумаги для рекомендаций
+            system_prompt = self._create_system_prompt(portfolio_data, market_context, market_context.get("alternatives", {}))
+            
+            # Используем function calling для ИИ-принятия решений о corpbonds.ru
             holdings = portfolio_data.get("holdings", [])
-            alternatives = {}
-            if holdings and any(keyword in message.lower() for keyword in ['рекомендац', 'замен', 'лучше', 'альтернатив', 'продать', 'купить']):
-                alternatives = await self._get_alternative_securities(holdings)
-            
-            system_prompt = self._create_system_prompt(portfolio_data, market_context, alternatives)
-            
-            response = await self._get_chatgpt_response(system_prompt, message)
+            response = await self._get_chatgpt_response_with_tools(system_prompt, message, holdings)
             
             return response
             
@@ -84,7 +84,8 @@ class InvestAnalyst:
                     for cash in detached_cash
                 ]
 
-            analysis = await self.portfolio_analyzer.run_analysis(user.id)
+            # Убираем полный анализ портфеля для текстовых сообщений
+            # analysis = await self.portfolio_analyzer.run_analysis(user.id)
 
             holdings_payload = [
                 {
@@ -116,7 +117,7 @@ class InvestAnalyst:
                 "holdings": holdings_payload,
                 "accounts": accounts_payload,
                 "detached_cash": cash_map.get(None, []),
-                "analysis": analysis
+                "analysis": None  # Убираем полный анализ для текстовых сообщений
             }
             
         except Exception as e:
@@ -254,6 +255,7 @@ class InvestAnalyst:
             logger.error(f"Error getting alternative securities: {e}")
             return {}
     
+    
     def _format_alternatives(self, alternatives: Dict[str, Any]) -> str:
         """Форматирует альтернативные ценные бумаги для промпта"""
         if not alternatives:
@@ -281,11 +283,12 @@ class InvestAnalyst:
         
         return alternatives_text
     
+    
     def _create_system_prompt(self, portfolio_data: Dict[str, Any], market_context: Dict[str, Any], alternatives: Dict[str, Any] = None) -> str:
         holdings = portfolio_data.get("holdings", [])
         accounts = portfolio_data.get("accounts", [])
         detached_cash = portfolio_data.get("detached_cash", [])
-        analysis = portfolio_data.get("analysis", {})
+        # analysis = portfolio_data.get("analysis", {})  # Убираем для текстовых сообщений
         news = market_context.get("news", [])
         moex_indices = market_context.get("moex_indices", {})
         currency_rates = market_context.get("currency_rates", {})
@@ -413,16 +416,45 @@ class InvestAnalyst:
 - Учитываешь риск-профиль клиента
 
 Твои возможности:
-- Анализируешь портфель пользователя
+- Анализируешь портфель пользователя в меру своих возможностей
 - Даешь рекомендации по инвестициям (включая конкретные покупки)
 - Даешь КОНКРЕТНЫЕ рекомендации по замене ценных бумаг в портфеле
 - Объясняешь рыночные события
 - Помогаешь с выбором ценных бумаг
-- Оцениваешь риски
+- Оцениваешь риски на основе доступных данных
 - Анализируешь новости и их влияние на рынок
 - Отслеживаешь индексы MOEX
 - Подключен к Tinkoff Investments API (T-Bank) и MOEX ISS API: можешь запрашивать цены, справочные данные, календари купонов, курсы валют и т.п.
 - Используешь объединенный маркет-агрегатор (MOEX + T-Bank + CorpBonds) для доступа к котировкам и характеристикам бумаг
+- Имеешь доступ к актуальным данным облигаций с corpbonds.ru через function calling
+- Можешь анализировать рейтинги, риски, доходность, ликвидность облигаций
+- Можешь получать информацию об эмитентах и отраслях
+
+АНАЛИТИЧЕСКИЕ ВОЗМОЖНОСТИ:
+Ты можешь проводить анализ в меру своих возможностей:
+
+1. **Анализ портфеля:**
+   - Оценивать диверсификацию по отраслям и типам активов
+   - Выявлять перевесы в портфеле
+   - Анализировать соотношение риск/доходность
+   - Оценивать ликвидность позиций
+
+2. **Анализ облигаций:**
+   - Используй function calling для получения актуальных данных с corpbonds.ru
+   - Анализируй рейтинги, риски, доходность
+   - Сравнивай с альтернативами на рынке
+   - Оценивай кредитное качество эмитентов
+
+3. **Анализ акций:**
+   - Используй данные MOEX и T-Bank для анализа
+   - Оценивай фундаментальные показатели
+   - Анализируй технические индикаторы
+   - Учитывай отраслевые тренды
+
+4. **Рыночный контекст:**
+   - Используй новости для анализа влияния на позиции
+   - Учитывай макроэкономические факторы
+   - Анализируй волатильность рынка
 
 КОНКРЕТНЫЕ РЕКОМЕНДАЦИИ ПО ЗАМЕНЕ:
 Когда пользователь спрашивает о конкретных рекомендациях по портфелю, ты можешь:
@@ -483,6 +515,140 @@ class InvestAnalyst:
         
         return system_prompt
     
+    async def _get_chatgpt_response_with_tools(self, system_prompt: str, user_message: str, holdings: List[Dict[str, Any]]) -> str:
+        """
+        Получает ответ от ChatGPT с возможностью вызова функций corpbonds.ru
+        ИИ сам решает, нужны ли ему данные corpbonds.ru
+        """
+        try:
+            # Определяем доступные облигации для запроса
+            bond_isins = [holding.get('isin') for holding in holdings 
+                         if holding.get('isin') and holding.get('isin').startswith('RU')]
+            
+            # Определяем функции, доступные для ИИ
+            tools = []
+            if bond_isins:
+                tools = [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "get_corpbonds_data",
+                            "description": "Получить актуальные данные облигаций с corpbonds.ru для анализа",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "isin": {
+                                        "type": "string",
+                                        "description": "ISIN облигации для анализа"
+                                    },
+                                    "context": {
+                                        "type": "string",
+                                        "description": "Контекст анализа: 'рейтинги', 'риски', 'доходность', 'ликвидность', 'финансовые показатели', 'полный анализ'",
+                                        "enum": ["рейтинги", "риски", "доходность", "ликвидность", "финансовые показатели", "полный анализ"]
+                                    }
+                                },
+                                "required": ["isin", "context"]
+                            }
+                        }
+                    }
+                ]
+            
+            # Обновляем системный промпт с информацией о доступных функциях
+            enhanced_prompt = system_prompt
+            if bond_isins:
+                enhanced_prompt += f"""
+
+ДОСТУПНЫЕ ФУНКЦИИ:
+У вас есть доступ к функции get_corpbonds_data для получения актуальных данных облигаций с corpbonds.ru.
+Доступные облигации в портфеле: {', '.join(bond_isins)}
+
+Используйте эту функцию, если пользователь спрашивает о:
+- Рейтингах облигаций
+- Рисках и анализе рисков
+- Доходности и YTM
+- Ликвидности и торговых данных
+- Финансовых показателях эмитентов
+- Информации об эмитентах и отраслях
+- Любых других деталях облигаций
+
+Выберите подходящий контекст для анализа в зависимости от вопроса пользователя.
+
+ВАЖНО: Используй function calling активно для получения актуальных данных облигаций, когда это поможет дать более качественный и обоснованный ответ пользователю."""
+            
+            messages = [
+                {"role": "system", "content": enhanced_prompt},
+                {"role": "user", "content": user_message}
+            ]
+            
+            # Первый запрос к ИИ
+            response = self.openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=tools if tools else None,
+                tool_choice="auto" if tools else None,
+                max_tokens=2000,
+                temperature=0.7
+            )
+            
+            message = response.choices[0].message
+            
+            # Если ИИ хочет вызвать функцию corpbonds.ru
+            if message.tool_calls:
+                logger.info(f"AI requested corpbonds data: {len(message.tool_calls)} calls")
+                
+                # Добавляем ответ ИИ в историю
+                messages.append({
+                    "role": "assistant", 
+                    "content": message.content,
+                    "tool_calls": message.tool_calls
+                })
+                
+                # Обрабатываем каждый вызов функции
+                for tool_call in message.tool_calls:
+                    if tool_call.function.name == "get_corpbonds_data":
+                        try:
+                            import json
+                            args = json.loads(tool_call.function.arguments)
+                            isin = args.get("isin")
+                            context = args.get("context", "полный анализ")
+                            
+                            logger.info(f"Getting corpbonds data for {isin} with context: {context}")
+                            
+                            # Получаем данные corpbonds.ru
+                            result = await ai_corpbonds.get_bond_data_for_ai(isin, context)
+                            
+                            # Добавляем результат в историю
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": json.dumps(result, ensure_ascii=False, indent=2)
+                            })
+                            
+                        except Exception as e:
+                            logger.error(f"Error processing corpbonds tool call: {e}")
+                            messages.append({
+                                "role": "tool",
+                                "tool_call_id": tool_call.id,
+                                "content": f"Ошибка получения данных: {str(e)}"
+                            })
+                
+                # Получаем финальный ответ от ИИ с учетом данных corpbonds.ru
+                final_response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=messages,
+                    max_tokens=2000,
+                    temperature=0.7
+                )
+                
+                return final_response.choices[0].message.content
+            
+            return message.content
+            
+        except Exception as e:
+            logger.error(f"Error in ChatGPT response with tools: {e}")
+            # Fallback к обычному ответу
+            return await self._get_chatgpt_response(system_prompt, user_message)
+    
     async def _get_chatgpt_response(self, system_prompt: str, user_message: str) -> str:
         try:
             response = self.openai_client.chat.completions.create(
@@ -500,6 +666,7 @@ class InvestAnalyst:
         except Exception as e:
             logger.error(f"Error getting ChatGPT response: {e}")
             return "Извините, не могу обработать ваш запрос. Попробуйте позже."
+    
 
 
 invest_analyst = InvestAnalyst()
