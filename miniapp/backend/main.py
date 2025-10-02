@@ -86,6 +86,8 @@ class SearchResult(BaseModel):
     ticker: Optional[str]
     isin: Optional[str]
     description: Optional[str] = None
+    security_type: Optional[str] = None
+    provider: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -245,6 +247,8 @@ def build_search_result(snapshot: MarketSnapshot) -> SearchResult:
         ticker=snapshot.ticker,
         isin=snapshot.isin,
         description=description,
+        security_type=snapshot.security_type,
+        provider=snapshot.provider,
     )
 
 
