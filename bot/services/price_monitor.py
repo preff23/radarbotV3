@@ -156,4 +156,4 @@ class PriceMonitor:
         return prices
 
 # Global price monitor instance
-price_monitor = PriceMonitor(change_threshold=1.0)  # 1% threshold
+price_monitor = PriceMonitor(change_threshold=0.01)  # 0.01% threshold (minimal)

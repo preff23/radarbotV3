@@ -111,4 +111,4 @@ class PriceMonitoringScheduler:
             return 0
 
 # Global scheduler instance
-scheduler = PriceMonitoringScheduler(check_interval_minutes=60)  # Check every hour
+scheduler = PriceMonitoringScheduler(check_interval_minutes=5)  # Check every 5 minutes for testing
