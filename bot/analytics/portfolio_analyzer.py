@@ -96,11 +96,23 @@ class PortfolioAnalyzer:
             bond_holdings = [h for h in holdings if h.security_type == "bond" or (h.isin and h.isin.startswith('RU'))]
             share_holdings = [h for h in holdings if h.security_type == "share"]
             
-            integrated_bond_data = await self._get_integrated_bond_data(bond_holdings)
+            # Запускаем загрузку данных параллельно для ускорения
+            logger.info("Starting parallel data loading...")
+            tasks = []
             
-            share_snapshots = []
+            # Загружаем данные облигаций
+            tasks.append(self._get_integrated_bond_data(bond_holdings))
+            
+            # Загружаем данные акций
             if share_holdings:
-                share_snapshots = await self._get_market_data(share_holdings)
+                tasks.append(self._get_market_data(share_holdings))
+            else:
+                tasks.append(asyncio.create_task(asyncio.sleep(0)))  # Пустая задача
+            
+            # Запускаем все задачи параллельно
+            results = await asyncio.gather(*tasks)
+            integrated_bond_data = results[0]
+            share_snapshots = results[1] if share_holdings else []
             
             all_snapshots = integrated_bond_data + share_snapshots
             
@@ -129,11 +141,16 @@ class PortfolioAnalyzer:
             bond_snapshots = [s for s in all_snapshots if getattr(s, 'security_type', None) == "bond"]
             logger.info(f"Bond snapshots for calendar: {len(bond_snapshots)}")
             
-            bond_calendar = await self._get_bond_calendar(all_snapshots)
+            # Запускаем загрузку дополнительных данных параллельно
+            logger.info("Starting parallel loading of calendar, news, and payment history...")
+            calendar_task = self._get_bond_calendar(all_snapshots)
+            news_task = self._get_news(all_snapshots)
+            payment_task = self._get_payment_history(all_snapshots)
             
-            news_items = await self._get_news(all_snapshots)
-            
-            payment_history = await self._get_payment_history(all_snapshots)
+            # Ждем завершения всех задач
+            bond_calendar, news_items, payment_history = await asyncio.gather(
+                calendar_task, news_task, payment_task
+            )
             
             has_shares = len(share_holdings) > 0
             try:
@@ -688,8 +705,19 @@ class PortfolioAnalyzer:
             with open(prompt_path, 'r', encoding='utf-8') as f:
                 system_prompt = f.read()
             
-            # Get macro data according to new prompt requirements
-            macro_data = await self._get_macro_data()
+            # Запускаем загрузку макро-данных и corpbonds.ru данных параллельно
+            logger.info("Starting parallel loading of macro data and corpbonds.ru data...")
+            macro_task = self._get_macro_data()
+            
+            # Get corpbonds.ru data for bonds in portfolio
+            bond_isins = [snapshot.isin for snapshot in snapshots if snapshot.isin and snapshot.isin.startswith('RU')]
+            corpbonds_task = corpbonds_service.get_multiple_bonds_data(bond_isins) if bond_isins else asyncio.create_task(asyncio.sleep(0))
+            
+            # Ждем завершения обеих задач
+            macro_data, corpbonds_data = await asyncio.gather(macro_task, corpbonds_task)
+            
+            if bond_isins:
+                logger.info(f"Retrieved corpbonds.ru data for {len([d for d in corpbonds_data.values() if 'error' not in d])}/{len(bond_isins)} bonds")
             
             # Build payload for AI
             metrics = self._calculate_metrics(snapshots)
@@ -815,14 +843,6 @@ class PortfolioAnalyzer:
                 "5. Дай конкретные действия (держать/сократить/докупать) с обоснованием и рисками.\n"
                 "6. Пиши по-русски, опирайся только на JSON, отмечай, если данных нет.\n"
             )
-            
-            # Get corpbonds.ru data for bonds in portfolio
-            logger.info("Fetching corpbonds.ru data for portfolio bonds...")
-            bond_isins = [snapshot.isin for snapshot in snapshots if snapshot.isin and snapshot.isin.startswith('RU')]
-            corpbonds_data = {}
-            if bond_isins:
-                corpbonds_data = await corpbonds_service.get_multiple_bonds_data(bond_isins)
-                logger.info(f"Retrieved corpbonds.ru data for {len([d for d in corpbonds_data.values() if 'error' not in d])}/{len(bond_isins)} bonds")
             
             # Format macro data for the prompt
             macro_block = f"""
