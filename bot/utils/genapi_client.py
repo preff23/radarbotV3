@@ -21,7 +21,7 @@ class GenAPIClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.gen-api.ru/api/v1"
-        self.network_id = "chat-gpt-3"  # ID для ChatGPT
+        self.network_id = "gpt-5"  # ID для GPT-5
         self.timeout = 300  # 5 минут максимум
         self.poll_interval = 2  # Проверяем каждые 2 секунды
     
