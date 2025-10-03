@@ -328,6 +328,9 @@ class PortfolioHandler:
                 await processing_msg.edit_text("Пользователь не найден")
                 return
 
+            # Обновляем статус
+            await processing_msg.edit_text("🔄 Обрабатываю фото...")
+            
             result = await self.ingest_pipeline.ingest_from_photo(user.phone_number, photo_bytes)
 
             if result.reason == "ok":
@@ -350,9 +353,30 @@ class PortfolioHandler:
                         message += "\n"
                 
                 await processing_msg.edit_text(message, parse_mode='Markdown')
-                # Сбрасываем флаг ожидания фото после успешной обработки
-                context.user_data.pop('waiting_for_photo', None)
-                context.user_data.pop('photo_prompt_message_id', None)
+                
+                # Проверяем, нужно ли автоматически запустить анализ
+                if context.user_data.get('auto_analysis'):
+                    await processing_msg.edit_text("✅ Фото обработано! Теперь делаю анализ портфеля...")
+                    
+                    # Импортируем analysis_handler для запуска анализа
+                    from bot.handlers.analysis import analysis_handler
+                    
+                    # Запускаем анализ
+                    await analysis_handler.run_analysis(update, context, user.phone_number)
+                    
+                    # Сбрасываем флаги только после завершения анализа
+                    context.user_data.pop('waiting_for_photo', None)
+                    context.user_data.pop('photo_prompt_message_id', None)
+                    context.user_data.pop('auto_analysis', None)
+                else:
+                    # Если не автоматический анализ, оставляем флаг waiting_for_photo для возможности загрузки нескольких фото
+                    # Сбрасываем только photo_prompt_message_id
+                    context.user_data.pop('photo_prompt_message_id', None)
+                    
+                    # Добавляем сообщение о возможности загрузить еще фото
+                    await update.message.reply_text(
+                        "📸 Можете загрузить еще фото или нажмите '📊 Анализ' для запуска анализа портфеля."
+                    )
             else:
                 error_messages = {
                     "not_portfolio": "❌ На изображении не обнаружен портфель ценных бумаг",
@@ -362,8 +386,10 @@ class PortfolioHandler:
                 
                 error_msg = error_messages.get(result.reason, "❌ Неизвестная ошибка")
                 await processing_msg.edit_text(error_msg)
-                # Сбрасываем флаг ожидания фото после ошибки, чтобы пользователь мог выйти из режима
-                context.user_data.pop('waiting_for_photo', None)
+                
+                # Если это автоматический режим, не сбрасываем флаг waiting_for_photo, чтобы можно было загрузить еще фото
+                if not context.user_data.get('auto_analysis'):
+                    context.user_data.pop('waiting_for_photo', None)
                 context.user_data.pop('photo_prompt_message_id', None)
             
         except Exception as e:
@@ -373,8 +399,9 @@ class PortfolioHandler:
             except Exception as send_error:
                 logger.error(f"Failed to send error message: {send_error}")
             finally:
-                # Сбрасываем флаг ожидания фото в случае исключения
-                context.user_data.pop('waiting_for_photo', None)
+                # Если это автоматический режим, не сбрасываем флаг waiting_for_photo в случае исключения
+                if not context.user_data.get('auto_analysis'):
+                    context.user_data.pop('waiting_for_photo', None)
                 context.user_data.pop('photo_prompt_message_id', None)
     
     async def handle_ticker_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

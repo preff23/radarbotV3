@@ -122,7 +122,16 @@ async def handle_contact(update, context) -> None:
             reply_markup=ReplyKeyboardRemove(),
         )
 
-        await send_main_menu(context, update.effective_chat.id, tg_user)
+        # Сразу просим загрузить фото портфеля
+        await update.message.reply_text(
+            "📸 **Загрузите фото вашего портфеля**\n\n"
+            "Можете загрузить несколько фото подряд - я обработаю их все и сделаю анализ портфеля.",
+            parse_mode="Markdown"
+        )
+        
+        # Устанавливаем флаг ожидания фото
+        context.user_data['waiting_for_photo'] = True
+        context.user_data['auto_analysis'] = True  # Флаг для автоматического анализа после загрузки
 
     except Exception as e:
         logger.error(f"Error handling contact: {e}")
