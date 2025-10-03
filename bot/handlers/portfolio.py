@@ -328,8 +328,9 @@ class PortfolioHandler:
                 await processing_msg.edit_text("Пользователь не найден")
                 return
 
-            # Обновляем статус
-            await processing_msg.edit_text("🔄 Обрабатываю фото...")
+            # Обновляем статус только если текст отличается
+            if processing_msg.text != "🔄 Обрабатываю фото...":
+                await processing_msg.edit_text("🔄 Обрабатываю фото...")
             
             result = await self.ingest_pipeline.ingest_from_photo(user.phone_number, photo_bytes)
 
@@ -356,7 +357,8 @@ class PortfolioHandler:
                 
                 # Проверяем, нужно ли автоматически запустить анализ
                 if context.user_data.get('auto_analysis'):
-                    await processing_msg.edit_text("✅ Фото обработано! Теперь делаю анализ портфеля...")
+                    if processing_msg.text != "✅ Фото обработано! Теперь делаю анализ портфеля...":
+                        await processing_msg.edit_text("✅ Фото обработано! Теперь делаю анализ портфеля...")
                     
                     # Импортируем analysis_handler для запуска анализа
                     from bot.handlers.analysis import analysis_handler
