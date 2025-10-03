@@ -175,7 +175,7 @@ class SmartDataLoader:
                         "title": item.title,
                         "summary": item.description or "",
                         "url": item.link,
-                        "published": item.published_at.strftime("%Y-%m-%d %H:%M") if item.published_at else "",
+                        "published": item.published_at.strftime("%Y-%m-%d %H:%M") if item.published_at is not None else "",
                         "source": item.source
                     }
                     for item in news_items[:5]  # Ограничиваем количество
