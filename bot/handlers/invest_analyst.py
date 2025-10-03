@@ -46,8 +46,10 @@ class InvestAnalyst:
             return response
             
         except Exception as e:
+            import traceback
             logger.error(f"Error in Invest chat: {e}")
-            return "Извините, произошла ошибка. Попробуйте позже."
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return f"Извините, произошла ошибка: {e}. Попробуйте позже."
     
     async def _get_user_portfolio_data(self, phone_number: str) -> Dict[str, Any]:
         try:
