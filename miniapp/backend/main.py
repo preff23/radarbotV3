@@ -1,3 +1,10 @@
+import sys
+import os
+from pathlib import Path
+
+# Добавляем корневую директорию в путь
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
