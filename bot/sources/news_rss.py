@@ -28,6 +28,8 @@ class NewsItem:
             self.related_issuers = []
         if self.matched_terms is None:
             self.matched_terms = []
+        if self.published_at is None:
+            self.published_at = datetime.now()
 
 
 class RSSNewsSource:
