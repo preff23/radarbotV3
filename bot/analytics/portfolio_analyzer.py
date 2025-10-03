@@ -908,7 +908,7 @@ class PortfolioAnalyzer:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=8000,
+                max_tokens=4000,
                 temperature=0.1
             )
             
