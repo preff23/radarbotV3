@@ -350,8 +350,9 @@ class PortfolioHandler:
                         message += "\n"
                 
                 await processing_msg.edit_text(message, parse_mode='Markdown')
-                context.user_data['waiting_for_photo'] = True
-                context.user_data['photo_prompt_message_id'] = processing_msg.message_id
+                # Сбрасываем флаг ожидания фото после успешной обработки
+                context.user_data.pop('waiting_for_photo', None)
+                context.user_data.pop('photo_prompt_message_id', None)
             else:
                 error_messages = {
                     "not_portfolio": "❌ На изображении не обнаружен портфель ценных бумаг",
@@ -361,8 +362,9 @@ class PortfolioHandler:
                 
                 error_msg = error_messages.get(result.reason, "❌ Неизвестная ошибка")
                 await processing_msg.edit_text(error_msg)
-                context.user_data['waiting_for_photo'] = True
-                context.user_data['photo_prompt_message_id'] = processing_msg.message_id
+                # Сбрасываем флаг ожидания фото после ошибки, чтобы пользователь мог выйти из режима
+                context.user_data.pop('waiting_for_photo', None)
+                context.user_data.pop('photo_prompt_message_id', None)
             
         except Exception as e:
             logger.error(f"Failed to handle photo: {e}", exc_info=True)
@@ -371,8 +373,9 @@ class PortfolioHandler:
             except Exception as send_error:
                 logger.error(f"Failed to send error message: {send_error}")
             finally:
-                context.user_data['waiting_for_photo'] = True
-                context.user_data['photo_prompt_message_id'] = processing_msg.message_id if 'processing_msg' in locals() else None
+                # Сбрасываем флаг ожидания фото в случае исключения
+                context.user_data.pop('waiting_for_photo', None)
+                context.user_data.pop('photo_prompt_message_id', None)
     
     async def handle_ticker_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:

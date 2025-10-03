@@ -572,6 +572,14 @@ class DatabaseManager:
             }
         finally:
             db.close()
+    
+    def get_users_count(self) -> int:
+        """Возвращает общее количество пользователей"""
+        db = self.SessionLocal()
+        try:
+            return db.query(User).count()
+        finally:
+            db.close()
 
 
 db_manager = DatabaseManager()

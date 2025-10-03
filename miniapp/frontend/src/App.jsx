@@ -33,6 +33,7 @@ import {
   Flex,
   rem,
   useMantineTheme,
+  Tabs,
 } from '@mantine/core'
 import { Notifications, notifications } from '@mantine/notifications'
 import { 
@@ -56,10 +57,13 @@ import {
   IconArrowDown,
   IconEye,
   IconSettings,
-  IconX
+  IconX,
+  IconDashboard,
+  IconChartBar
 } from '@tabler/icons-react'
 import './App.css'
-import { MINIAPP_REV } from './version' 
+import { MINIAPP_REV } from './version'
+import MonitoringDashboard from './components/MonitoringDashboard' 
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
 
@@ -941,6 +945,7 @@ export default function App() {
   const [userPhone, setUserPhone] = useState(null)
   const [showPhoneConfirmation, setShowPhoneConfirmation] = useState(false)
   const [detectedPhone, setDetectedPhone] = useState(null)
+  const [activeTab, setActiveTab] = useState('portfolio')
 
   const handleLogout = () => {
     setUserPhone(null)
@@ -1197,8 +1202,44 @@ export default function App() {
                 </Stack>
               </Group>
               <Group gap="sm">
-              <Button
-                variant="light"
+                <Button
+                  variant={activeTab === 'portfolio' ? 'filled' : 'light'}
+                  color="white"
+                  size="md"
+                  leftSection={<IconWallet size={18} />}
+                  onClick={() => setActiveTab('portfolio')}
+                  radius="xl"
+                  style={{
+                    background: activeTab === 'portfolio' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: 'white',
+                    fontWeight: '600',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Портфель
+                </Button>
+                <Button
+                  variant={activeTab === 'monitoring' ? 'filled' : 'light'}
+                  color="white"
+                  size="md"
+                  leftSection={<IconDashboard size={18} />}
+                  onClick={() => setActiveTab('monitoring')}
+                  radius="xl"
+                  style={{
+                    background: activeTab === 'monitoring' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    color: 'white',
+                    fontWeight: '600',
+                    backdropFilter: 'blur(10px)',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Мониторинг
+                </Button>
+                <Button
+                  variant="light"
                   color="white"
                   size="md"
                   leftSection={<IconLogout size={18} />}
@@ -1222,132 +1263,169 @@ export default function App() {
                   }}
                 >
                   Выйти
-              </Button>
-            </Group>
+                </Button>
+              </Group>
           </Group>
           </Container>
         </AppShell.Header>
         <AppShell.Main>
           <Notifications position="top-center" />
           <Container size="xl" px="md" py="lg">
-            {loading && (
-              <Center py="xl">
-                <Stack align="center" gap="md">
-                  <Loader size="xl" color="blue" />
-                  <Text size="lg" fw={500} c="dimmed">Загрузка портфеля...</Text>
-                </Stack>
-              </Center>
-            )}
-            {error && (
-              <Alert 
-                color="red" 
-                title="Ошибка" 
-                icon={<IconX size={16} />}
-                radius="xl"
-                style={{ marginBottom: '1rem' }}
-              >
-                {error.message}
-              </Alert>
-            )}
-            {!loading && !error && data && (
-              <Stack gap="xl">
-                <AccountTabs
-                  accounts={accounts}
-                  active={activeAccount}
-                  onChange={setActiveAccount}
-                />
-                {currentAccount ? (
-                  <Stack gap="md">
-                    <Card 
-                      shadow="xl" 
-                      padding="xl" 
-                      radius="xl"
-                      style={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        border: 'none',
-                        color: 'white'
-                      }}
-                    >
-                      <Group justify="space-between" align="center">
-                        <Group gap="md">
-                          <ThemeIcon 
-                            size="xl" 
-                            radius="xl" 
-                            variant="light" 
-                            color="white"
-                            style={{ 
-                              background: 'rgba(255,255,255,0.2)',
-                              backdropFilter: 'blur(10px)'
+            {activeTab === 'portfolio' && (
+              <>
+                {loading && (
+                  <Center py="xl">
+                    <Stack align="center" gap="md">
+                      <Loader size="xl" color="blue" />
+                      <Text size="lg" fw={500} c="dimmed">Загрузка портфеля...</Text>
+                    </Stack>
+                  </Center>
+                )}
+                {error && (
+                  <Alert 
+                    color="red" 
+                    title="Ошибка" 
+                    icon={<IconX size={16} />}
+                    radius="xl"
+                    style={{ marginBottom: '1rem' }}
+                  >
+                    {error.message}
+                  </Alert>
+                )}
+                {!loading && !error && data && (
+                  <Stack gap="xl">
+                    <AccountTabs
+                      accounts={accounts}
+                      active={activeAccount}
+                      onChange={setActiveAccount}
+                    />
+                    {currentAccount ? (
+                      <Stack gap="md">
+                        <Card 
+                          shadow="xl" 
+                          padding="xl" 
+                          radius="xl"
+                          style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            border: 'none',
+                            color: 'white'
+                          }}
+                        >
+                          <Group justify="space-between" align="center">
+                            <Group gap="md">
+                              <ThemeIcon 
+                                size="xl" 
+                                radius="xl" 
+                                variant="light" 
+                                color="white"
+                                style={{ 
+                                  background: 'rgba(255,255,255,0.2)',
+                                  backdropFilter: 'blur(10px)'
+                                }}
+                              >
+                                <IconWallet size={24} />
+                              </ThemeIcon>
+                              <Stack gap="xs">
+                                <Text size="xl" fw={800} c="white">
+                                  Портфель
+                                </Text>
+                                <Group gap="md">
+                                  <Badge
+                                    variant="light"
+                                    color="white"
+                                    size="lg"
+                                    style={{ 
+                                      background: 'rgba(255,255,255,0.2)',
+                                      color: 'white',
+                                      fontSize: '12px'
+                                    }}
+                                  >
+                                    {currentAccount.currency || 'RUB'}
+                                  </Badge>
+                                  <Badge
+                                    variant="light"
+                                    color="white"
+                                    size="lg"
+                                    style={{ 
+                                      background: 'rgba(255,255,255,0.2)',
+                                      color: 'white',
+                                      fontSize: '12px'
+                                    }}
+                                  >
+                                    {currentAccount.positions.length} бумаг
+                                  </Badge>
+                                </Group>
+                              </Stack>
+                            </Group>
+                            {currentAccount.portfolio_value && (
+                              <Stack gap="xs" align="flex-end">
+                                <Text size="sm" c="rgba(255,255,255,0.8)">Общая стоимость</Text>
+                                <Text fw={800} size="xl" c="white">
+                                  {currentAccount.portfolio_value.toLocaleString()} ₽
+                                </Text>
+                              </Stack>
+                            )}
+                          </Group>
+                        </Card>
+                        <Group justify="space-between" align="center" mb="md">
+                          <Text size="lg" fw={600} c="dark">
+                            Позиции портфеля
+                          </Text>
+                          <Button
+                            leftSection={<IconPlus size={16} />}
+                            onClick={() => setAddOpened(true)}
+                            size="md"
+                            radius="xl"
+                            style={{
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              border: 'none',
+                              color: 'white',
+                              fontWeight: '600',
+                              boxShadow: '0 4px 15px rgba(102, 126, 234, 0.3)',
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-2px)'
+                              e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0)'
+                              e.currentTarget.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.3)'
                             }}
                           >
-                            <IconWallet size={24} />
-                          </ThemeIcon>
-                          <Stack gap="xs">
-                            <Text size="xl" fw={800} c="white">
-                              Портфель
-                            </Text>
-                            <Group gap="md">
-                              <Badge
-                                variant="light"
-                                color="white"
-                                size="lg"
-                                style={{ 
-                                  background: 'rgba(255,255,255,0.2)',
-                                  color: 'white',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                {currentAccount.currency || 'RUB'}
-                              </Badge>
-                              <Badge
-                                variant="light"
-                                color="white"
-                                size="lg"
-                                style={{ 
-                                  background: 'rgba(255,255,255,0.2)',
-                                  color: 'white',
-                                  fontSize: '12px'
-                                }}
-                              >
-                                {currentAccount.positions.length} бумаг
-                              </Badge>
-                            </Group>
-                          </Stack>
+                            Добавить бумагу
+                          </Button>
                         </Group>
-                        {currentAccount.portfolio_value && (
-                          <Stack gap="xs" align="flex-end">
-                            <Text size="sm" c="rgba(255,255,255,0.8)">Общая стоимость</Text>
-                            <Text fw={800} size="xl" c="white">
-                              {currentAccount.portfolio_value.toLocaleString()} ₽
-                            </Text>
-                          </Stack>
-                        )}
-                      </Group>
-                    </Card>
-                    <PortfolioTable
-                      account={currentAccount}
-                      onEdit={(pos) => setEditTarget(pos)}
-                      onDelete={handleDelete}
-                    />
+                        <PortfolioTable
+                          account={currentAccount}
+                          onEdit={(pos) => setEditTarget(pos)}
+                          onDelete={handleDelete}
+                        />
+                      </Stack>
+                    ) : (
+                      <Card
+                        shadow="sm"
+                        padding="xl"
+                        radius="md"
+                        withBorder
+                        style={{ textAlign: 'center' }}
+                      >
+                        <Stack gap="md">
+                          <Avatar size="xl" color="gray" variant="light">
+                            <IconMinus size={32} />
+                          </Avatar>
+                          <Text size="lg" fw={500} c="dimmed">Портфель пуст</Text>
+                          <Text size="sm" c="dimmed">Добавьте ценные бумаги для начала работы</Text>
+                        </Stack>
+                      </Card>
+                    )}
                   </Stack>
-                ) : (
-                  <Card
-                    shadow="sm"
-                    padding="xl"
-                    radius="md"
-                    withBorder
-                    style={{ textAlign: 'center' }}
-                  >
-                    <Stack gap="md">
-                      <Avatar size="xl" color="gray" variant="light">
-                        <IconMinus size={32} />
-                      </Avatar>
-                      <Text size="lg" fw={500} c="dimmed">Портфель пуст</Text>
-                      <Text size="sm" c="dimmed">Добавьте ценные бумаги для начала работы</Text>
-                    </Stack>
-                  </Card>
                 )}
-              </Stack>
+              </>
+            )}
+            
+            {activeTab === 'monitoring' && (
+              <MonitoringDashboard />
             )}
           </Container>
         </AppShell.Main>

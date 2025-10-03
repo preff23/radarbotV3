@@ -235,6 +235,7 @@ async def message_handler(update, context):
             if update.message and update.message.text:
                 context.user_data.pop('waiting_for_photo', None)
                 # Продолжаем обработку как обычное текстовое сообщение
+                logger.info(f"User {update.effective_user.id} exited photo waiting mode, processing text: {update.message.text}")
             else:
                 if update.message:
                     await update.message.reply_text(
@@ -247,6 +248,7 @@ async def message_handler(update, context):
             if update.message and update.message.text:
                 context.user_data.pop('waiting_for_ticker', None)
                 # Продолжаем обработку как обычное текстовое сообщение
+                logger.info(f"User {update.effective_user.id} exited ticker waiting mode, processing text: {update.message.text}")
             else:
                 await portfolio_handler.handle_ticker_input(update, context)
                 return

@@ -434,7 +434,7 @@ async def get_security_details(
         return details
         
     except Exception as exc:
-        logger.error(f"Failed to get security details for {isin}: {exc}")
+        logger.error(f"Failed to get security details for {ticker}: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -470,7 +470,7 @@ async def get_payment_calendar(
             ).all()
             
             if not holdings:
-                return {"events": [], "month": month, "year": year}
+                return {"events": [], "month": now.month, "year": now.year}
             
             events = []
             
