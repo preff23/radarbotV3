@@ -364,7 +364,7 @@ class PortfolioHandler:
                     from bot.handlers.analysis import analysis_handler
                     
                     # Запускаем анализ
-                    await analysis_handler.run_analysis(update, context, user.phone_number)
+                    await analysis_handler.handle_analysis_command(update, context)
                     
                     # Сбрасываем флаги только после завершения анализа
                     context.user_data.pop('waiting_for_photo', None)
