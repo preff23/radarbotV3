@@ -172,11 +172,11 @@ class SmartDataLoader:
             result = {
                 "news": [
                     {
-                        "title": item.get("title", ""),
-                        "summary": item.get("summary", ""),
-                        "url": item.get("url", ""),
-                        "published": item.get("published", ""),
-                        "source": item.get("source", "")
+                        "title": item.title,
+                        "summary": item.description or "",
+                        "url": item.link,
+                        "published": item.published_at.strftime("%Y-%m-%d %H:%M") if item.published_at else "",
+                        "source": item.source
                     }
                     for item in news_items[:5]  # Ограничиваем количество
                 ]
