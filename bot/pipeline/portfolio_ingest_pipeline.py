@@ -11,6 +11,8 @@ from bot.providers.aggregator import market_aggregator
 from bot.core.db import db_manager, PortfolioHoldingV2, PortfolioCashPosition
 from bot.core.logging import get_logger
 from bot.utils.bond_reference import load_bond_reference
+from bot.core.error_handler import handle_error, ErrorSeverity, ErrorCategory, ErrorContext, safe_execute_async
+from bot.utils.ocr_cache import ocr_cache
 from typing import Set
 
 logger = get_logger(__name__)
@@ -68,23 +70,37 @@ class PortfolioIngestPipeline:
                 
                 user_id = user.id
                 
-                ocr_result = await self._extract_positions(image_bytes)
-                if not ocr_result or not getattr(ocr_result, "accounts", None):
-                    logger.warning("OCR did not return accounts")
-                    return IngestResult(added=0, merged=0, positions=[], reason="error", raw_detected=0, normalized=0, resolved=0)
+                ocr_result = await self._extract_positions(image_bytes, phone_number)
+                if not ocr_result:
+                    logger.warning("OCR failed to extract positions")
+                    return IngestResult(added=0, merged=0, positions=[], reason="ocr_failed", raw_detected=0, normalized=0, resolved=0)
 
                 if getattr(ocr_result, "warnings", None):
                     logger.info(f"OCR returned warnings: {ocr_result.warnings}")
 
-                processed_accounts, raw_detected = await self._prepare_accounts_payload(ocr_result)
-                if not processed_accounts:
-                    logger.warning("No valid accounts detected after OCR normalization")
+                try:
+                    processed_accounts, raw_detected = await self._prepare_accounts_payload(ocr_result)
+                    if not processed_accounts:
+                        logger.warning("No valid accounts detected after OCR normalization")
+                        return IngestResult(
+                            added=0,
+                            merged=0,
+                            positions=[],
+                            reason="no_valid_securities",
+                            raw_detected=raw_detected,
+                            normalized=0,
+                            resolved=0
+                        )
+                except Exception as e:
+                    logger.error(f"Error preparing accounts payload: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
                     return IngestResult(
                         added=0,
                         merged=0,
                         positions=[],
-                        reason="no_valid_securities",
-                        raw_detected=raw_detected,
+                        reason="processing_error",
+                        raw_detected=0,
                         normalized=0,
                         resolved=0
                     )
@@ -133,16 +149,49 @@ class PortfolioIngestPipeline:
                     resolved=0
                 )
     
-    async def _extract_positions(self, image_bytes: bytes) -> OCRResult:
+    async def _extract_positions(self, image_bytes: bytes, phone_number: str = None) -> Optional[OCRResult]:
+        error_context = ErrorContext(
+            phone_number=phone_number,
+            operation="ocr_extraction"
+        )
+        
         try:
+            if not image_bytes:
+                logger.error("Empty image bytes provided")
+                return None
+            
+            # Пытаемся получить результат из кэша
+            cached_result = ocr_cache.get(image_bytes)
+            if cached_result:
+                logger.info(f"OCR result retrieved from cache for user {phone_number}")
+                return cached_result
+            
+            # Если в кэше нет, выполняем OCR
+            logger.info(f"Performing OCR for user {phone_number} (not in cache)")
             result = self.vision_processor.extract_positions_for_ingest(image_bytes)
-            if not result or not getattr(result, "accounts", None):
+            
+            if not result:
+                logger.error("OCR returned None result")
+                return None
+                
+            if not hasattr(result, "accounts") or not result.accounts:
                 logger.error("OCR returned no accounts")
-                return OCRResult(accounts=[], cash_positions=[], reason="error", is_portfolio=False)
+                return None
+            
+            # Сохраняем результат в кэш
+            ocr_cache.put(image_bytes, result, ttl=3600)  # 1 час
+            logger.info(f"OCR successfully extracted {len(result.accounts)} accounts and cached result")
+            
             return result
+            
         except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            return OCRResult(accounts=[], cash_positions=[], reason="error", is_portfolio=False)
+            handle_error(
+                e,
+                severity=ErrorSeverity.HIGH,
+                category=ErrorCategory.OCR,
+                context=error_context
+            )
+            return None
     
     async def _normalize_positions(self, positions: List[ExtractedPosition]) -> List[Dict[str, Any]]:
         normalized_positions = []
@@ -547,6 +596,15 @@ class PortfolioIngestPipeline:
     async def _prepare_accounts_payload(self, ocr_result: OCRResult) -> Tuple[List[Dict[str, Any]], int]:
         prepared_accounts = []
         total_raw_detected = 0
+
+        # Проверяем, что ocr_result не None и имеет нужные атрибуты
+        if not ocr_result:
+            logger.error("OCR result is None")
+            return [], 0
+        
+        if not hasattr(ocr_result, 'accounts') or not ocr_result.accounts:
+            logger.error("OCR result has no accounts")
+            return [], 0
 
         cash_by_account: Dict[str, List[Dict[str, Any]]] = {}
         for cash in getattr(ocr_result, "cash_positions", []) or []:

@@ -577,7 +577,7 @@ class PortfolioAnalyzer:
     
     async def _get_macro_data(self) -> Dict[str, Any]:
         """Get current macro data according to new prompt requirements"""
-        import requests
+        import httpx
         from datetime import datetime
         
         macro_data = {
@@ -605,9 +605,12 @@ class PortfolioAnalyzer:
             
             # Get USD/RUB and EUR/RUB rates from MOEX
             try:
-                # Get USD/RUB
-                usd_response = requests.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json", timeout=10)
-                eur_response = requests.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/EUR000UTSTOM.json", timeout=10)
+                async with httpx.AsyncClient() as client:
+                    # Get USD/RUB and EUR/RUB in parallel
+                    usd_task = client.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/USD000UTSTOM.json", timeout=10)
+                    eur_task = client.get("https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities/EUR000UTSTOM.json", timeout=10)
+                    
+                    usd_response, eur_response = await asyncio.gather(usd_task, eur_task)
                 
                 usd_rate = None
                 eur_rate = None
@@ -653,14 +656,15 @@ class PortfolioAnalyzer:
             
             # Get IMOEX from MOEX
             try:
-                response = requests.get("https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json", timeout=10)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('marketdata', {}).get('data'):
-                        imoex_value = data['marketdata']['data'][0][4]  # Close price
-                        macro_data["imoex"] = f"IMOEX: {imoex_value}"
-                else:
-                    macro_data["warnings"].append("IMOEX недоступен")
+                async with httpx.AsyncClient() as client:
+                    response = await client.get("https://iss.moex.com/iss/engines/stock/markets/index/boards/SNDX/securities/IMOEX.json", timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get('marketdata', {}).get('data'):
+                            imoex_value = data['marketdata']['data'][0][4]  # Close price
+                            macro_data["imoex"] = f"IMOEX: {imoex_value}"
+                    else:
+                        macro_data["warnings"].append("IMOEX недоступен")
             except:
                 macro_data["warnings"].append("IMOEX недоступен")
             

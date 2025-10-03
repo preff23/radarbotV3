@@ -1,5 +1,7 @@
 import asyncio
 import os
+import signal
+import sys
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from bot.core.config import config
 from bot.core.logging import setup_logging, get_logger
@@ -8,12 +10,45 @@ from bot.handlers.portfolio import portfolio_handler
 from bot.handlers.analysis import analysis_handler
 from bot.handlers.invest_analyst import invest_analyst
 from bot.utils.onboarding import send_main_menu, request_phone_number, handle_contact
+from bot.core.error_handler import handle_error, ErrorSeverity, ErrorCategory, ErrorContext, safe_execute_async
 
 setup_logging()
 logger = get_logger(__name__)
 
+# Глобальная переменная для приложения
+application = None
+
+def signal_handler(signum, frame):
+    """Обработчик сигналов для graceful shutdown"""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    if application:
+        try:
+            # Останавливаем polling
+            asyncio.create_task(application.stop())
+            asyncio.create_task(application.shutdown())
+            logger.info("Application stopped gracefully")
+        except Exception as e:
+            logger.error(f"Error during graceful shutdown: {e}")
+    sys.exit(0)
+
+async def graceful_shutdown():
+    """Graceful shutdown приложения"""
+    logger.info("Starting graceful shutdown...")
+    try:
+        if application:
+            await application.stop()
+            await application.shutdown()
+        logger.info("Graceful shutdown completed")
+    except Exception as e:
+        logger.error(f"Error during graceful shutdown: {e}")
+
 
 async def start_command(update, context):
+    error_context = ErrorContext(
+        user_id=str(update.effective_user.id) if update.effective_user else None,
+        operation="start_command"
+    )
+    
     try:
         user = update.effective_user
 
@@ -27,16 +62,25 @@ async def start_command(update, context):
         await send_main_menu(context, update.effective_chat.id, user)
 
     except Exception as e:
-        logger.error(f"Error in start command: {e}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        error_info = handle_error(
+            e,
+            severity=ErrorSeverity.HIGH,
+            category=ErrorCategory.TELEGRAM,
+            context=error_context
+        )
+        
         try:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="Произошла ошибка. Попробуйте позже.",
             )
         except Exception as send_error:
-            logger.error(f"Failed to send error message: {send_error}")
+            handle_error(
+                send_error,
+                severity=ErrorSeverity.MEDIUM,
+                category=ErrorCategory.TELEGRAM,
+                context=error_context
+            )
 
 
 async def help_command(update, context):
@@ -161,6 +205,11 @@ async def callback_handler(update, context):
 
 
 async def message_handler(update, context):
+    error_context = ErrorContext(
+        user_id=str(update.effective_user.id) if update.effective_user else None,
+        operation="message_handler"
+    )
+    
     try:
         if update.message and update.message.contact:
             await handle_contact(update, context)
@@ -218,10 +267,21 @@ async def message_handler(update, context):
         except Exception as e:
             # Останавливаем анимацию в случае ошибки
             await animation.stop()
-            raise e
+            handle_error(
+                e,
+                severity=ErrorSeverity.HIGH,
+                category=ErrorCategory.BUSINESS_LOGIC,
+                context=error_context
+            )
+            await update.message.reply_text("Извините, произошла ошибка при обработке сообщения. Попробуйте позже.")
 
     except Exception as e:
-        logger.error(f"Error in message handler: {e}")
+        error_info = handle_error(
+            e,
+            severity=ErrorSeverity.HIGH,
+            category=ErrorCategory.TELEGRAM,
+            context=error_context
+        )
         await update.message.reply_text("Извините, произошла ошибка. Попробуйте позже.")
 
 
@@ -250,11 +310,17 @@ async def photo_handler(update, context):
 
 
 def main():
+    global application
+    
     try:
         config.validate()
         
         create_tables()
         logger.info("Database tables created successfully")
+        
+        # Регистрируем обработчики сигналов
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
         
         application = Application.builder().token(config.telegram_bot_token).build()
         
@@ -270,8 +336,16 @@ def main():
         application.add_handler(MessageHandler(filters.PHOTO, photo_handler))
         
         logger.info("Starting RadarBot 3.0...")
+        
+        # Запускаем приложение с обработкой ошибок
         try:
-            application.run_polling(allowed_updates=["message", "callback_query"])
+            application.run_polling(
+                allowed_updates=["message", "callback_query"],
+                drop_pending_updates=True,  # Игнорируем старые обновления
+                close_loop=False  # Не закрываем event loop при остановке
+            )
+        except KeyboardInterrupt:
+            logger.info("Received keyboard interrupt, shutting down...")
         except Exception as poll_err:
             logger.error(f"Polling stopped: {poll_err}")
             raise
@@ -279,6 +353,13 @@ def main():
     except Exception as e:
         logger.error(f"Failed to start bot: {e}")
         raise
+    finally:
+        # Graceful shutdown при выходе
+        if application:
+            try:
+                asyncio.run(graceful_shutdown())
+            except Exception as shutdown_err:
+                logger.error(f"Error during final shutdown: {shutdown_err}")
 
 
 if __name__ == "__main__":

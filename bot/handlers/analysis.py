@@ -53,6 +53,7 @@ class AnalysisHandler:
             except:
                 pass
     
+    
     async def _send_analysis_results(self, message, analysis: dict):
         try:
             logger.info("Starting to send analysis results")
@@ -218,6 +219,30 @@ class AnalysisHandler:
                 await message.chat.send_message("Ошибка при отправке результатов анализа")
             except Exception as send_error:
                 logger.error(f"Failed to send error message: {send_error}")
+    
+    async def _send_detailed_analysis(self, update: Update, user_id: int):
+        """Отправляет детальный анализ проблемных эмитентов"""
+        try:
+            from bot.handlers.invest_analyst import invest_analyst
+            
+            # Получаем номер телефона пользователя
+            user = self.db_manager.get_user_by_id(user_id)
+            if not user or not getattr(user, 'phone_number', None):
+                logger.warning(f"No phone number for user {user_id}")
+                return
+            
+            # Запускаем детальный анализ
+            detailed_analysis = await invest_analyst._run_detailed_analysis(user.phone_number)
+            
+            # Отправляем результат
+            chat = update.effective_chat
+            if detailed_analysis and "❌" not in detailed_analysis:
+                await chat.send_message(detailed_analysis)
+            else:
+                logger.warning(f"Detailed analysis failed or empty for user {user_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to send detailed analysis: {e}")
 
 
 analysis_handler = AnalysisHandler()

@@ -17,6 +17,8 @@ from bot.utils.normalize import normalize_security_name, generate_normalized_key
 from bot.providers.aggregator import market_aggregator, MarketSnapshot
 from bot.utils.bond_reference import load_bond_reference
 from bot.api.corpbonds_endpoints import router as corpbonds_router
+from bot.api.cache_endpoints import router as cache_router
+from bot.api.health_endpoints import router as health_router
 from bot.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -125,6 +127,12 @@ app.add_middleware(
 
 # Register corpbonds.ru API endpoints
 app.include_router(corpbonds_router)
+
+# Register cache management endpoints
+app.include_router(cache_router)
+
+# Register health monitoring endpoints
+app.include_router(health_router)
 
 
 def get_current_user(
