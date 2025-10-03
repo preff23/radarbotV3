@@ -241,6 +241,10 @@ class AnalysisHandler:
             logger.error(f"Failed to send analysis results: {e}", exc_info=True)
             logger.error(f"AI text length: {len(ai_text) if ai_text else 'None'}")
             logger.error(f"AI text preview: {ai_text[:200] if ai_text else 'None'}")
+            logger.error(f"AI text type: {type(ai_text)}")
+            if ai_text:
+                logger.error(f"AI text contains newlines: {'\\n' in str(ai_text)}")
+                logger.error(f"AI text contains special chars: {any(ord(c) > 127 for c in str(ai_text)[:100])}")
             try:
                 await message.chat.send_message("Ошибка при отправке результатов анализа")
             except Exception as send_error:
