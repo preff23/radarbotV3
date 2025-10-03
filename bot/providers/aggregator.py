@@ -316,6 +316,9 @@ class MarketDataAggregator:
                     elif ticker and len(ticker) > 3 and ticker.startswith("RU"):
                         security_type = "bond"
                         logger.info(f"Fallback: determined {ticker} as bond based on ticker pattern")
+                    elif resolved.get('type') == 'currency':
+                        security_type = "currency"
+                        logger.info(f"Determined {ticker} as currency")
                     else:
                         security_type = "unknown"
                         logger.warning(f"Unknown MOEX type '{resolved.get('type')}' for ticker '{ticker}'")
