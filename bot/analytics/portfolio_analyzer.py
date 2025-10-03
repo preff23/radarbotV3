@@ -226,8 +226,13 @@ class PortfolioAnalyzer:
             
             logger.info(f"Getting payment history for {len(bond_snapshots)} bonds")
             
+            logger.info(f"Getting payment history for {len(bond_snapshots)} bonds in parallel")
+            
             history_tasks = [
-                self.payment_history_analyzer.get_payment_history(snapshot.secid, months_back=12)
+                asyncio.wait_for(
+                    self.payment_history_analyzer.get_payment_history(snapshot.secid, months_back=12),
+                    timeout=90.0  # 90 секунд максимум для всех облигаций одновременно
+                )
                 for snapshot in bond_snapshots
             ]
             history_results = await asyncio.gather(*history_tasks, return_exceptions=True)
@@ -344,12 +349,24 @@ class PortfolioAnalyzer:
             async with IntegratedBondClient() as client:
                 await client._load_corpbonds_data()
                 
-                integrated_data = []
+                # Создаем задачи для параллельной загрузки данных
+                tasks = []
                 for holding in bond_holdings:
+                    isin_to_use = holding.isin if holding.isin else holding.ticker
+                    task = client.get_bond_data(isin_to_use, holding.ticker)
+                    tasks.append((holding, task))
+                
+                # Запускаем все задачи параллельно
+                results = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+                
+                integrated_data = []
+                for i, (holding, _) in enumerate(tasks):
                     try:
-                        isin_to_use = holding.isin if holding.isin else holding.ticker
-                        
-                        bond_data = await client.get_bond_data(isin_to_use, holding.ticker)
+                        bond_data = results[i]
+                        if isinstance(bond_data, Exception):
+                            logger.error(f"Failed to get data for {holding.isin}: {bond_data}")
+                            continue
+                            
                         if bond_data:
                             snapshot_data = {
                                 'isin': bond_data.isin,
@@ -711,10 +728,19 @@ class PortfolioAnalyzer:
             
             # Get corpbonds.ru data for bonds in portfolio
             bond_isins = [snapshot.isin for snapshot in snapshots if snapshot.isin and snapshot.isin.startswith('RU')]
-            corpbonds_task = corpbonds_service.get_multiple_bonds_data(bond_isins) if bond_isins else asyncio.create_task(asyncio.sleep(0))
+            logger.info(f"Loading corpbonds.ru data for {len(bond_isins)} bonds: {bond_isins[:5]}...")
+            if bond_isins:
+                corpbonds_task = asyncio.wait_for(
+                    corpbonds_service.get_multiple_bonds_data(bond_isins),
+                    timeout=120.0  # 2 минуты на загрузку всех данных corpbonds.ru
+                )
+            else:
+                corpbonds_task = asyncio.create_task(asyncio.sleep(0))
             
             # Ждем завершения обеих задач
+            logger.info("Waiting for macro data and corpbonds.ru data...")
             macro_data, corpbonds_data = await asyncio.gather(macro_task, corpbonds_task)
+            logger.info("Macro data and corpbonds.ru data loaded successfully")
             
             if bond_isins:
                 logger.info(f"Retrieved corpbonds.ru data for {len([d for d in corpbonds_data.values() if 'error' not in d])}/{len(bond_isins)} bonds")

@@ -344,7 +344,8 @@ def main():
             application.run_polling(
                 allowed_updates=["message", "callback_query"],
                 drop_pending_updates=True,  # Игнорируем старые обновления
-                close_loop=False  # Не закрываем event loop при остановке
+                close_loop=False,  # Не закрываем event loop при остановке
+                stop_signals=None  # Отключаем автоматическую обработку сигналов
             )
         except KeyboardInterrupt:
             logger.info("Received keyboard interrupt, shutting down...")
