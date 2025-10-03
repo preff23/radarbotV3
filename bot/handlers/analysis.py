@@ -209,12 +209,38 @@ class AnalysisHandler:
                     if current_chunk:
                         await chat.send_message(current_chunk)
                 else:
-                    await chat.send_message(f"🤖 AI Анализ (v14.4)\n\n{ai_text}")
+                    # Проверяем длину сообщения
+                    full_text = f"🤖 AI Анализ (v14.4)\n\n{ai_text}"
+                    if len(full_text) > 4096:
+                        # Разбиваем на части
+                        max_chunk_size = 4000
+                        chunks = []
+                        current_chunk = "🤖 AI Анализ (v14.4)\n\n"
+                        
+                        paragraphs = ai_text.split('\n\n')
+                        for para in paragraphs:
+                            if len(current_chunk + para) > max_chunk_size and current_chunk:
+                                chunks.append(current_chunk)
+                                current_chunk = para
+                            else:
+                                current_chunk += '\n\n' + para if current_chunk else para
+                        
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                        
+                        for i, chunk in enumerate(chunks):
+                            if i > 0:
+                                chunk = f"🤖 AI Анализ (v14.4) - часть {i+1}\n\n{chunk}"
+                            await chat.send_message(chunk)
+                    else:
+                        await chat.send_message(full_text)
             
             logger.info("Analysis results sent successfully")
             
         except Exception as e:
             logger.error(f"Failed to send analysis results: {e}", exc_info=True)
+            logger.error(f"AI text length: {len(ai_text) if ai_text else 'None'}")
+            logger.error(f"AI text preview: {ai_text[:200] if ai_text else 'None'}")
             try:
                 await message.chat.send_message("Ошибка при отправке результатов анализа")
             except Exception as send_error:
