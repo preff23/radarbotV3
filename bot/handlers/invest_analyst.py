@@ -379,7 +379,7 @@ class InvestAnalyst:
         if news:
             news_summary = "Последние новости рынка:\n"
             for item in news:
-                news_summary += f"- {item['title']} ({item['source']}, {item['published_at']})\n"
+                news_summary += f"- {item['title']} ({item['source']}, {item['published']})\n"
         else:
             news_summary = "Новости рынка недоступны."
         
