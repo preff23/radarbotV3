@@ -68,9 +68,9 @@ class PortfolioAnalyzer:
         self.db_manager = db_manager
         self.market_aggregator = market_aggregator
         self.payment_history_analyzer = PaymentHistoryAnalyzer()
-        # Используем gen-api.ru вместо NeuroAPI для лучшей производительности
-        from bot.utils.genapi_client import GenAPIOpenAIAdapter
-        self.openai_client = GenAPIOpenAIAdapter(config.openai_api_key)
+        # Используем OpenAI напрямую с gpt-5
+        import openai
+        self.openai_client = openai.OpenAI(api_key=config.openai_api_key)
     
     async def run_analysis(self, user_id: int) -> Dict[str, Any]:
         """Run comprehensive portfolio analysis.
@@ -902,13 +902,13 @@ class PortfolioAnalyzer:
 Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
             """
  
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+            response = self.openai_client.chat.completions.create(
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=4000,
+                max_tokens=8000,
                 temperature=0.1
             )
             
