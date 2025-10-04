@@ -953,21 +953,21 @@ class PortfolioAnalyzer:
 Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
             """
  
-            logger.info("Starting AI analysis generation with GPT-5...")
+            logger.info("Starting AI analysis generation with GPT-4o-mini...")
             logger.info(f"Payload size: {len(user_message)} characters")
             
             response = await self.openai_client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=20000,  # Увеличиваем до 20к токенов для GPT-5
+                max_tokens=4000,
                 temperature=0.1
             )
             
             ai_text = response.choices[0].message.content
-            logger.info("GPT-5 analysis generated successfully")
+            logger.info("GPT-4o-mini analysis generated successfully")
             logger.info(f"Response length: {len(ai_text)} characters")
             
             return ai_text
