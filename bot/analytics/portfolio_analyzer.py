@@ -558,7 +558,7 @@ class PortfolioAnalyzer:
             logger.info("Generating AI analysis...")
             ai_analysis = await self._generate_ai_analysis(
                 snapshots, bond_calendar, news_items, payment_history, 
-                accounts, cash_by_account, ocr_meta
+                accounts, cash_by_account, ocr_meta, holdings
             )
             logger.info(f"AI analysis generated: {len(ai_analysis)} characters")
             
@@ -957,12 +957,12 @@ class PortfolioAnalyzer:
             logger.info(f"Payload size: {len(user_message)} characters")
             
             response = await self.openai_client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=6000,  # Увеличиваем для GPT-5
+                max_tokens=4000,
                 temperature=0.1
             )
             
