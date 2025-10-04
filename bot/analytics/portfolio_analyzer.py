@@ -68,11 +68,11 @@ class PortfolioAnalyzer:
         self.db_manager = db_manager
         self.market_aggregator = market_aggregator
         self.payment_history_analyzer = PaymentHistoryAnalyzer()
-        # Используем NeuroAPI
+        # Используем NeuroAPI с увеличенным таймаутом для GPT-5
         self.openai_client = openai.AsyncOpenAI(
             api_key=config.openai_api_key,
             base_url="https://neuroapi.host/v1",
-            timeout=120.0,
+            timeout=300.0,  # 5 минут для GPT-5
             max_retries=3
         )
     
@@ -948,12 +948,12 @@ class PortfolioAnalyzer:
             logger.info(f"Payload size: {len(user_message)} characters")
             
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-5",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                max_tokens=4000,
+                max_tokens=6000,  # Увеличиваем для GPT-5
                 temperature=0.1
             )
             
