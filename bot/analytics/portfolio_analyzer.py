@@ -557,8 +557,8 @@ class PortfolioAnalyzer:
             # Генерируем AI анализ
             logger.info("Generating AI analysis...")
             ai_analysis = await self._generate_ai_analysis(
-                snapshots, bond_calendar, news_items, payment_history, 
-                accounts, cash_by_account, ocr_meta, holdings
+                snapshots, bond_calendar, news_items, ocr_meta, 
+                payment_history, accounts, cash_by_account
             )
             logger.info(f"AI analysis generated: {len(ai_analysis)} characters")
             
