@@ -944,8 +944,11 @@ class PortfolioAnalyzer:
 Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
             """
  
+            logger.info("Starting AI analysis generation...")
+            logger.info(f"Payload size: {len(user_message)} characters")
+            
             response = await self.openai_client.chat.completions.create(
-                model="gpt-5",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
@@ -953,6 +956,9 @@ class PortfolioAnalyzer:
                 max_tokens=4000,
                 temperature=0.1
             )
+            
+            logger.info("AI analysis generated successfully")
+            logger.info(f"Response length: {len(response.choices[0].message.content)} characters")
             
             return response.choices[0].message.content
             
