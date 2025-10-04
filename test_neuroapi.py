@@ -21,7 +21,7 @@ async def test_neuroapi():
     
     try:
         # Создаем клиент
-        api_key = os.getenv("OPENAI_API_KEY", "sk-3lObctPRQiG7Pal1iDyiwQjdcipcvJRHDqvrbFGTmBeK735FUOS9sFevOBYa")
+        api_key = os.getenv("OPENAI_API_KEY", "sk-ljmNZVQv5Fjdom5CMlelMKjbZtpjRDYeqjdtzFJXJSZtWsx8")
         client = openai.AsyncOpenAI(
             api_key=api_key,
             base_url="https://neuroapi.host/v1",

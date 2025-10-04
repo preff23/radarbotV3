@@ -359,20 +359,60 @@ class PortfolioAnalyzer:
                 logger.info("No bond holdings found for integrated analysis")
                 return []
             
-            logger.info(f"Creating basic snapshots for {len(bond_holdings)} bond holdings (skipping external APIs)")
+            # Получаем данные через integrated_bond_client
+            from bot.utils.integrated_bond_client import IntegratedBondClient
+            client = IntegratedBondClient()
             
-            # Создаем базовые снапшоты без внешних API
+            isins = [h.isin or h.ticker for h in bond_holdings if h.isin or h.ticker]
+            logger.info(f"Getting integrated bond data for {len(isins)} bonds: {isins}")
+            
             integrated_data = []
             for holding in bond_holdings:
                 try:
+                    isin = holding.isin or holding.ticker
+                    if not isin:
+                        continue
+                        
+                    snapshot = await client.get_bond_data(isin)
+                    if snapshot:
+                        snapshot.holding_id = holding.id
+                        snapshot.raw_name = holding.raw_name
+                        snapshot.raw_quantity = holding.raw_quantity
+                        integrated_data.append(snapshot)
+                    else:
+                        # Создаем базовый снапшот если данные не найдены
+                        snapshot_data = {
+                            'isin': isin,
+                            'name': holding.normalized_name or holding.raw_name,
+                            'issuer_name': holding.normalized_name or holding.raw_name,
+                            'price': 100.0,
+                            'yield_to_maturity': 10.0,
+                            'duration': 2.0,
+                            'face_value': 1000.0,
+                            'sector': "Unknown",
+                            'security_type': 'bond',
+                            'confidence': 'low',
+                            'corpbonds_found': False,
+                            'tbank_found': False,
+                            'moex_found': False,
+                            'holding_id': holding.id,
+                            'raw_name': holding.raw_name,
+                            'raw_quantity': holding.raw_quantity
+                        }
+                        snapshot = IntegratedSnapshot(snapshot_data)
+                        integrated_data.append(snapshot)
+                        
+                except Exception as e:
+                    logger.error(f"Failed to get data for {holding.isin}: {e}")
+                    # Создаем базовый снапшот при ошибке
                     snapshot_data = {
                         'isin': holding.isin or holding.ticker,
                         'name': holding.normalized_name or holding.raw_name,
                         'issuer_name': holding.normalized_name or holding.raw_name,
-                        'price': 100.0,  # Базовое значение
-                        'yield_to_maturity': 10.0,  # Базовое значение
-                        'duration': 2.0,  # Базовое значение
-                        'face_value': 1000.0,  # Базовое значение
+                        'price': 100.0,
+                        'yield_to_maturity': 10.0,
+                        'duration': 2.0,
+                        'face_value': 1000.0,
                         'sector': "Unknown",
                         'security_type': 'bond',
                         'confidence': 'low',
@@ -385,11 +425,8 @@ class PortfolioAnalyzer:
                     }
                     snapshot = IntegratedSnapshot(snapshot_data)
                     integrated_data.append(snapshot)
-                    
-                except Exception as e:
-                    logger.error(f"Failed to create snapshot for {holding.isin}: {e}")
             
-            logger.info(f"Created {len(integrated_data)} basic snapshots")
+            logger.info(f"Created {len(integrated_data)} integrated snapshots")
             return integrated_data
                 
         except Exception as e:
