@@ -157,11 +157,20 @@ class IntegratedBondClient:
             if not bond_data and ticker:
                 bond_data = await self._get_moex_data_by_ticker(ticker)
             
-            if bond_data:
-                await self._enrich_with_tbank_data(bond_data, isin or ticker)
+            # Если нет данных от CorpBonds.ru и MOEX, создаем базовый объект
+            if not bond_data:
+                bond_data = BondData(
+                    isin=isin,
+                    name=isin,
+                    issuer_name=isin,
+                    security_type="bond"
+                )
             
-            if bond_data:
-                await self._enrich_with_moex_data(bond_data, isin or ticker)
+            # Всегда пытаемся обогатить данными T-Bank
+            await self._enrich_with_tbank_data(bond_data, isin or ticker)
+            
+            # Всегда пытаемся обогатить данными MOEX
+            await self._enrich_with_moex_data(bond_data, isin or ticker)
             
             if bond_data:
                 bond_data.last_updated = datetime.now()
