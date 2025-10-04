@@ -33,6 +33,27 @@ class BondData:
     
     last_updated: Optional[datetime] = None
     confidence: str = "low"
+    
+    # Дополнительные атрибуты для совместимости с IntegratedSnapshot
+    last_price: Optional[float] = None
+    change_day_pct: Optional[float] = None
+    currency: str = "RUB"
+    ticker: Optional[str] = None
+    secid: Optional[str] = None
+    trading_status: str = "NormalTrading"
+    shortname: Optional[str] = None
+    board: str = "TQCB"
+    aci: float = 0.0
+    ytm: Optional[float] = None
+    next_coupon_date: Optional[datetime] = None
+    provider: str = "integrated"
+    maturity_date: Optional[datetime] = None
+    coupon_rate: float = 0.0
+    coupon_frequency: int = 0
+    issue_date: Optional[datetime] = None
+    issue_size: float = 0.0
+    rating: Optional[str] = None
+    rating_agency: Optional[str] = None
 
 
 class IntegratedBondClient:
@@ -172,6 +193,9 @@ class IntegratedBondClient:
             # Всегда пытаемся обогатить данными MOEX
             await self._enrich_with_moex_data(bond_data, isin or ticker)
             
+            # Синхронизируем атрибуты для совместимости
+            self._sync_attributes(bond_data)
+            
             if bond_data:
                 bond_data.last_updated = datetime.now()
                 self.cache[cache_key] = (bond_data, datetime.now())
@@ -181,6 +205,20 @@ class IntegratedBondClient:
         except Exception as e:
             logger.error(f"Failed to get bond data for {isin}/{ticker}: {e}")
             return None
+    
+    def _sync_attributes(self, bond_data: BondData):
+        """Синхронизирует атрибуты для совместимости с IntegratedSnapshot"""
+        if bond_data:
+            # Синхронизируем основные атрибуты
+            bond_data.last_price = bond_data.price
+            bond_data.ytm = bond_data.yield_to_maturity
+            bond_data.ticker = bond_data.isin
+            bond_data.secid = bond_data.isin
+            bond_data.shortname = bond_data.name
+            
+            # Устанавливаем значения по умолчанию если не заданы
+            if bond_data.change_day_pct is None:
+                bond_data.change_day_pct = 0.0
     
     async def _get_corpbonds_data(self, isin: str) -> Optional[BondData]:
         try:
