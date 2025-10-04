@@ -266,8 +266,7 @@ class PortfolioHandler:
             parts = []
             parts.append(clean_text(analysis["summary"]))
             
-            if analysis.get("signals_table"):
-                parts.append("📊 •Таблица сигналов•\n\n" + clean_text(analysis["signals_table"]))
+            # Убираем отправку таблицы сигналов - пусть ИИ сам решает формат
             if analysis.get("calendar_30d"):
                 parts.append(clean_text(analysis["calendar_30d"]))
             if analysis.get("payment_history_summary") and "Нет данных" not in analysis["payment_history_summary"]:

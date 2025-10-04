@@ -541,7 +541,8 @@ class PortfolioAnalyzer:
         try:
             summary = render_portfolio_summary(snapshots, ocr_meta, accounts, cash_by_account)
             
-            signals_table = await render_signals_as_cards(snapshots, has_shares)
+            # Убираем формирование таблицы сигналов - пусть ИИ сам решает формат
+            signals_table = ""
             
             calendar_text = render_calendar_30d(bond_calendar)
             

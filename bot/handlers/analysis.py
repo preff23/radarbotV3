@@ -89,30 +89,7 @@ class AnalysisHandler:
             else:
                 await message.edit_text(summary_text)
             
-            if analysis["signals_table"]:
-                logger.info("Sending signals table")
-                signals_text = "📊 •Таблица сигналов•\n\n" + analysis["signals_table"]
-                signals_text = clean_text(signals_text)
-                
-                if len(signals_text) > max_chunk_size:
-                    logger.info(f"Signals table too long ({len(signals_text)} chars), splitting into chunks")
-                    await chat.send_message("📊 •Таблица сигналов•")
-                    clean_signals_table = clean_text(analysis["signals_table"])
-                    cards = clean_signals_table.split('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-                    current_chunk = ""
-                    for i, card in enumerate(cards):
-                        if i == 0:
-                            continue
-                        card_text = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━' + card
-                        if len(current_chunk + card_text) > max_chunk_size and current_chunk:
-                            await chat.send_message(current_chunk)
-                            current_chunk = card_text
-                        else:
-                            current_chunk += card_text
-                    if current_chunk:
-                        await chat.send_message(current_chunk)
-                else:
-                    await chat.send_message(signals_text)
+            # Убираем отправку таблицы сигналов - пусть ИИ сам решает формат
             
             if analysis.get("calendar_30d"):
                 calendar_text = analysis["calendar_30d"]
