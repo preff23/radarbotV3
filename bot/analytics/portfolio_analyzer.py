@@ -963,9 +963,9 @@ class PortfolioAnalyzer:
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_message}
                     ],
-                    max_tokens=8000,  # Увеличиваем для GPT-5
-                    temperature=0.3,  # Немного увеличиваем для GPT-5
-                    top_p=0.9  # Добавляем top_p для GPT-5
+                    max_tokens=4000,  # Уменьшаем для GPT-5
+                    temperature=0.1,  # Возвращаем к стандартному значению
+                    # Убираем top_p - возможно, GPT-5 его не поддерживает
                 )
                 
                 ai_text = response.choices[0].message.content
