@@ -554,6 +554,14 @@ class PortfolioAnalyzer:
             
             metrics = self._calculate_metrics(snapshots)
             
+            # Генерируем AI анализ
+            logger.info("Generating AI analysis...")
+            ai_analysis = await self._generate_ai_analysis(
+                snapshots, bond_calendar, news_items, payment_history, 
+                accounts, cash_by_account, ocr_meta
+            )
+            logger.info(f"AI analysis generated: {len(ai_analysis)} characters")
+            
             return {
                 "summary": summary,
                 "signals_table": signals_table,
@@ -565,6 +573,7 @@ class PortfolioAnalyzer:
                 "recommendations": recommendations,
                 "metrics": metrics,
                 "payment_history": payment_history,
+                "ai_analysis": ai_analysis,  # Добавляем AI анализ
                 "generated_at": datetime.now().isoformat()
             }
             
