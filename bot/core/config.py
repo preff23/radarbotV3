@@ -24,7 +24,7 @@ class Config:
     news_rss_smartlab: str = "https://smart-lab.ru/rss/news/"
 
     vision_provider: str = "openai"
-    vision_model: str = "gpt-4o-mini"
+    vision_model: str = "gpt-4o"
 
     feature_news_alerts: bool = True
     feature_analysis_v13: bool = True
@@ -52,7 +52,7 @@ class Config:
             news_rss_rbc=os.getenv("NEWS_RSS_RBC", "https://rssexport.rbc.ru/rbcnews/news/30/full.rss"),
             news_rss_smartlab=os.getenv("NEWS_RSS_SMARTLAB", "https://smart-lab.ru/rss/news/"),
             vision_provider=os.getenv("VISION_PROVIDER", "openai"),
-            vision_model=os.getenv("VISION_MODEL", "gpt-4o-mini"),
+            vision_model=os.getenv("VISION_MODEL", "gpt-4o"),
             feature_news_alerts=os.getenv("FEATURE_NEWS_ALERTS", "1") == "1",
             feature_analysis_v13=os.getenv("FEATURE_ANALYSIS_V13", "1") == "1",
             feature_analysis_v14=os.getenv("FEATURE_ANALYSIS_V14", "1") == "1",
