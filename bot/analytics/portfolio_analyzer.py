@@ -953,23 +953,50 @@ class PortfolioAnalyzer:
 Используй все доступные цифры, поясняй выводы и делай рекомендации, полезные инвестору.
             """
  
-            logger.info("Starting AI analysis generation...")
+            logger.info("Starting AI analysis generation with GPT-5...")
             logger.info(f"Payload size: {len(user_message)} characters")
             
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                max_tokens=4000,
-                temperature=0.1
-            )
-            
-            logger.info("AI analysis generated successfully")
-            logger.info(f"Response length: {len(response.choices[0].message.content)} characters")
-            
-            return response.choices[0].message.content
+            try:
+                response = await self.openai_client.chat.completions.create(
+                    model="gpt-5",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    max_tokens=8000,  # Увеличиваем для GPT-5
+                    temperature=0.3,  # Немного увеличиваем для GPT-5
+                    top_p=0.9  # Добавляем top_p для GPT-5
+                )
+                
+                ai_text = response.choices[0].message.content
+                logger.info("GPT-5 analysis generated successfully")
+                logger.info(f"Response length: {len(ai_text)} characters")
+                
+                if not ai_text or len(ai_text.strip()) < 50:
+                    logger.warning("GPT-5 returned empty or very short response, trying GPT-4o-mini as fallback")
+                    raise Exception("GPT-5 returned empty response")
+                
+                return ai_text
+                
+            except Exception as e:
+                logger.warning(f"GPT-5 failed: {e}, trying GPT-4o-mini as fallback")
+                
+                # Fallback на GPT-4o-mini
+                response = await self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    max_tokens=4000,
+                    temperature=0.1
+                )
+                
+                ai_text = response.choices[0].message.content
+                logger.info("GPT-4o-mini fallback analysis generated successfully")
+                logger.info(f"Response length: {len(ai_text)} characters")
+                
+                return ai_text
             
         except Exception as e:
             logger.error(f"Failed to generate AI analysis: {e}")
